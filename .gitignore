@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.DS_Store
 
 logs/*
 !logs/.gitkeep
