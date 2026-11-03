@@ -4,7 +4,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from common.config import UserAccount
+from common.config import ApplicationConfig, UserAccount
 
 
 @dataclass(frozen=True)
@@ -15,3 +15,4 @@ class ExecutionContext:
     user: UserAccount
     user_index: int
     user_count: int
+    config: ApplicationConfig

@@ -59,8 +59,25 @@ def run(context: ExecutionContext) -> None:
         "&& document.body.innerText.trim().length > 0",
         timeout=SITE_ACTION_TIMEOUT_MS,
     )
+    context.page.wait_for_load_state(
+        "load",
+        timeout=SITE_ACTION_TIMEOUT_MS,
+    )
+    context.page.locator("#bname").wait_for(
+        state="visible",
+        timeout=SITE_ACTION_TIMEOUT_MS,
+    )
+    context.page.wait_for_function(
+        """() => {
+            const parkSelect = document.querySelector("#bname");
+            return parkSelect
+                && !parkSelect.disabled
+                && parkSelect.options.length > 0;
+        }""",
+        timeout=SITE_ACTION_TIMEOUT_MS,
+    )
     context.logger.info(
-        "Lottery category page rendered successfully: %s (HTTP %s).",
+        "Lottery category page and park selector are ready: %s (HTTP %s).",
         context.page.url,
         response.status if response is not None else "no response",
     )

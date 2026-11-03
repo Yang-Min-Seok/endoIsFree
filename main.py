@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from common.browser import open_browser
-from common.config import load_user_accounts
+from common.config import load_config
 from common.context import ExecutionContext
 from common.logging_config import configure_logging
 from steps import step1, step2, step3, step4, step5, step6, step7
@@ -11,7 +11,7 @@ from steps import step1, step2, step3, step4, step5, step6, step7
 def main() -> None:
     project_root = Path(__file__).resolve().parent
     logger = configure_logging(project_root)
-    accounts = load_user_accounts(project_root / "endoCustom" / "endoCustom.json")
+    config = load_config(project_root / "endoCustom" / "endoCustom.json")
 
     steps = (
         step1.run,
@@ -23,8 +23,12 @@ def main() -> None:
         step7.run,
     )
     with open_browser() as browser:
-        for user_index, user in enumerate(accounts, start=1):
-            logger.info("Starting workflow for account %d/%d.", user_index, len(accounts))
+        for user_index, user in enumerate(config.users, start=1):
+            logger.info(
+                "Starting workflow for account %d/%d.",
+                user_index,
+                len(config.users),
+            )
             browser_context = browser.new_context()
             try:
                 context = ExecutionContext(
@@ -33,7 +37,8 @@ def main() -> None:
                     page=browser_context.new_page(),
                     user=user,
                     user_index=user_index,
-                    user_count=len(accounts),
+                    user_count=len(config.users),
+                    config=config,
                 )
                 for run_step in steps:
                     run_step(context)
