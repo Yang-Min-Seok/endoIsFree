@@ -9,3 +9,4 @@ logs/*
 
 endoCustom/*
 !endoCustom/.gitkeep
+!endoCustom/customizer.html
