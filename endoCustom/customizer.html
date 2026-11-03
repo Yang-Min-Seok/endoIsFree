@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>設定ファイル作成 | endoIsFree</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      color: #172b3a;
+      background: #f3f7f5;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      --green: #16745a;
+      --green-dark: #105941;
+      --muted: #62727b;
+      --border: #dce6e1;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 85% 0, #dcefe5 0, transparent 38rem),
+        #f3f7f5;
+    }
+
+    .page {
+      width: min(760px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 48px 0 64px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      color: var(--green-dark);
+      font-size: 14px;
+      font-weight: 750;
+      letter-spacing: .04em;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 40px;
+      height: 40px;
+      place-items: center;
+      border-radius: 13px;
+      background: var(--green);
+      color: white;
+      font-size: 22px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 5vw, 38px);
+      letter-spacing: -.04em;
+    }
+
+    .intro {
+      max-width: 620px;
+      margin: 12px 0 28px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .privacy {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      padding: 16px 18px;
+      border: 1px solid #cce5d8;
+      border-radius: 14px;
+      background: #eaf6ef;
+      color: #245c46;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .privacy strong { display: block; margin-bottom: 2px; }
+    .privacy-icon { font-size: 20px; line-height: 1.2; }
+
+    form { display: grid; gap: 16px; }
+
+    .card {
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 8px 24px rgb(26 63 47 / 4%);
+    }
+
+    .card-heading {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 16px;
+    }
+
+    .step-number {
+      display: grid;
+      flex: 0 0 32px;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border-radius: 10px;
+      background: #e7f3ed;
+      color: var(--green);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    h2 { margin: 0; font-size: 17px; }
+    .subheading { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+
+    label, .field-label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #cbd8d2;
+      border-radius: 10px;
+      background: #fff;
+      color: #172b3a;
+      font: inherit;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    input, select { min-height: 46px; padding: 10px 12px; }
+    textarea { min-height: 190px; padding: 12px; resize: vertical; line-height: 1.7; }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgb(22 116 90 / 13%);
+    }
+
+    .help {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .format {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: #f0f4f2;
+      color: #344a40;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .date-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto;
+      align-items: end;
+      gap: 10px;
+      max-width: 390px;
+    }
+
+    .date-unit { padding-bottom: 13px; color: var(--muted); }
+
+    .status {
+      min-height: 24px;
+      margin: 16px 0 0;
+      color: #a23232;
+      font-size: 14px;
+      font-weight: 650;
+      line-height: 1.6;
+    }
+
+    .status.success { color: var(--green-dark); }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    button {
+      min-height: 48px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 11px;
+      background: var(--green);
+      color: white;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--green-dark); }
+    button:focus-visible { outline: 3px solid #87c6a9; outline-offset: 3px; }
+    button:disabled { background: #a9bbb2; cursor: not-allowed; }
+
+    .destination { color: var(--muted); font-size: 13px; }
+    .destination code { color: #334b3f; }
+
+    footer {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.7;
+      text-align: center;
+    }
+
+    @media (max-width: 560px) {
+      .page { padding-top: 30px; }
+      .card { padding: 18px; }
+      .grid-two { grid-template-columns: 1fr; }
+      .actions { align-items: stretch; flex-direction: column; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">🎾</span> endoIsFree</div>
+    <h1>endoCustom を作成</h1>
+    <p class="intro">
+      申し込みに使う情報を入力して、設定ファイルを作成します。
+      上から順番に入力すれば大丈夫です。
+    </p>
+
+    <aside class="privacy" aria-label="個人情報について">
+      <span class="privacy-icon" aria-hidden="true">🔒</span>
+      <div>
+        <strong>入力した情報はこの端末内だけで処理されます</strong>
+        サーバーへの送信やブラウザーへの自動保存は行いません。
+        ダウンロードしたファイルにはパスワードが含まれるため、大切に保管してください。
+      </div>
+    </aside>
+
+    <form id="custom-form" novalidate>
+      <section class="card" aria-labelledby="accounts-heading">
+        <div class="card-heading">
+          <span class="step-number">1</span>
+          <div>
+            <h2 id="accounts-heading">利用者情報</h2>
+            <p class="subheading">申し込みに使うアカウントを入力</p>
+          </div>
+        </div>
+        <label for="accounts">利用者番号とパスワード</label>
+        <textarea id="accounts" autocomplete="off" spellcheck="false"
+          placeholder="利用者番号,パスワード&#10;利用者番号,パスワード&#10;利用者番号,パスワード"
+          aria-describedby="accounts-help" required></textarea>
+        <p class="help" id="accounts-help">
+          1行に1アカウントずつ入力してください。登録人数に上限はありません。
+          空行は無視され、重複した利用者番号はエラーになります。
+        </p>
+        <code class="format">利用者番号,パスワード</code>
+      </section>
+
+      <section class="card" aria-labelledby="place-heading">
+        <div class="card-heading">
+          <span class="step-number">2</span>
+          <div>
+            <h2 id="place-heading">公園・施設</h2>
+            <p class="subheading">全アカウントで共通の申し込み先</p>
+          </div>
+        </div>
+        <div class="grid-two">
+          <div>
+            <label for="park">公園名</label>
+            <input id="park" name="park" type="text" autocomplete="off"
+              placeholder="例：○○公園" required>
+          </div>
+          <div>
+            <label for="facility">施設名</label>
+            <input id="facility" name="facility" type="text" autocomplete="off"
+              placeholder="例：テニスコート" required>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="date-heading">
+        <div class="card-heading">
+          <span class="step-number">3</span>
+          <div>
+            <h2 id="date-heading">利用日</h2>
+            <p class="subheading">申し込みたい月日を入力</p>
+          </div>
+        </div>
+        <div class="date-row">
+          <div>
+            <label for="month">月</label>
+            <input id="month" name="month" type="number" min="1" max="12"
+              inputmode="numeric" placeholder="例：5" required>
+          </div>
+          <span class="date-unit" aria-hidden="true">月</span>
+          <div>
+            <label for="day">日</label>
+            <input id="day" name="day" type="number" min="1" max="31"
+              inputmode="numeric" placeholder="例：20" required>
+          </div>
+          <span class="date-unit" aria-hidden="true">日</span>
+        </div>
+        <p class="help">年は入力不要です。月日に合わない日付は作成時にお知らせします。</p>
+      </section>
+
+      <section class="card" aria-labelledby="time-heading">
+        <div class="card-heading">
+          <span class="step-number">4</span>
+          <div>
+            <h2 id="time-heading">開始時間</h2>
+            <p class="subheading">申し込みたい時間帯を1つ選択</p>
+          </div>
+        </div>
+        <label for="start-time">開始時間</label>
+        <select id="start-time" name="start_time" required>
+          <option value="">時間を選択してください</option>
+          <option value="9">9:00</option>
+          <option value="11">11:00</option>
+          <option value="13">13:00</option>
+          <option value="15">15:00</option>
+          <option value="17">17:00</option>
+          <option value="19">19:00</option>
+        </select>
+      </section>
+
+      <section class="card" aria-labelledby="save-heading">
+        <div class="card-heading">
+          <span class="step-number">✓</span>
+          <div>
+            <h2 id="save-heading">設定ファイルを保存</h2>
+            <p class="subheading">入力内容を確認してファイルを作成</p>
+          </div>
+        </div>
+        <p class="help">
+          パスワードを含むJSONファイルをダウンロードします。
+          保存後、プロジェクト内の <code>endoCustom</code> フォルダーに移動してください。
+        </p>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <div class="actions">
+          <button id="download" type="submit">設定ファイルを作成</button>
+          <span class="destination">ファイル名：<code>endoCustom.json</code></span>
+        </div>
+      </section>
+    </form>
+
+    <footer>
+      このツールは設定ファイルを作成します。現在、申し込みプログラムへの読み込み機能は別途実装が必要です。
+    </footer>
+  </main>
+
+  <script>
+    "use strict";
+
+    const form = document.querySelector("#custom-form");
+    const accountsInput = document.querySelector("#accounts");
+    const status = document.querySelector("#status");
+    const downloadButton = document.querySelector("#download");
+    const allowedStartTimes = new Set(["9", "11", "13", "15", "17", "19"]);
+
+    function parseAccounts(text) {
+      const accounts = [];
+      const seenNumbers = new Set();
+      const lines = text.split(/\r?\n/);
+
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (line.trim() === "") continue;
+
+        const separator = line.indexOf(",");
+        if (separator < 0) {
+          throw new Error(`${index + 1}行目：利用者番号とパスワードをカンマで区切ってください。`);
+        }
+
+        const userNumber = line.slice(0, separator).trim();
+        const password = line.slice(separator + 1);
+        if (!userNumber || !password) {
+          throw new Error(`${index + 1}行目：利用者番号またはパスワードが空です。`);
+        }
+        if (seenNumbers.has(userNumber)) {
+          throw new Error(`${index + 1}行目：利用者番号が重複しています。`);
+        }
+
+        seenNumbers.add(userNumber);
+        accounts.push({ user_number: userNumber, password });
+      }
+
+      if (accounts.length === 0) {
+        throw new Error("利用者情報を1件以上入力してください。");
+      }
+      return accounts;
+    }
+
+    function readFormData() {
+      const accounts = parseAccounts(accountsInput.value);
+      const park = document.querySelector("#park").value.trim();
+      const facility = document.querySelector("#facility").value.trim();
+      const month = Number(document.querySelector("#month").value);
+      const day = Number(document.querySelector("#day").value);
+      const startTimeValue = document.querySelector("#start-time").value;
+
+      if (!park) throw new Error("公園名を入力してください。");
+      if (!facility) throw new Error("施設名を入力してください。");
+      if (!Number.isInteger(month) || month < 1 || month > 12) {
+        throw new Error("月は1から12の数字で入力してください。");
+      }
+      if (!Number.isInteger(day) || day < 1 || day > 31) {
+        throw new Error("日は1から31の数字で入力してください。");
+      }
+
+      const daysInMonth = new Date(2024, month, 0).getDate();
+      if (day > daysInMonth) {
+        throw new Error(`${month}月に${day}日はありません。`);
+      }
+      if (!allowedStartTimes.has(startTimeValue)) {
+        throw new Error("開始時間を一覧から1つ選択してください。");
+      }
+
+      return {
+        users: accounts,
+        park,
+        facility,
+        month,
+        day,
+        start_time: Number(startTimeValue),
+      };
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      status.textContent = "";
+      status.classList.remove("success");
+      downloadButton.disabled = true;
+
+      try {
+        const data = readFormData();
+        const file = new Blob([`${JSON.stringify(data, null, 2)}\n`], {
+          type: "application/json;charset=utf-8",
+        });
+        const fileUrl = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = fileUrl;
+        link.download = "endoCustom.json";
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(fileUrl), 1000);
+
+        status.textContent = `${data.users.length}件の利用者情報を含む設定ファイルを作成しました。endoCustom フォルダーに移動してください。`;
+        status.classList.add("success");
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : "入力内容を確認してください。";
+        status.classList.remove("success");
+      } finally {
+        downloadButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
