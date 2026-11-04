@@ -16,7 +16,13 @@ class ApplicationConfig:
     facility: str
     month: int
     day: int
-    start_time: int
+    activity_hours: int
+    start_times: tuple[int, ...]
+    show_browser: bool = True
+
+    @property
+    def start_time(self) -> int:
+        return self.start_times[0]
 
 
 def load_config(config_path: Path) -> ApplicationConfig:
@@ -76,17 +82,47 @@ def load_config(config_path: Path) -> ApplicationConfig:
 
     month = config.get("month")
     day = config.get("day")
-    start_time = config.get("start_time")
+    activity_hours = config.get("activity_hours", 2)
+    if (
+        not isinstance(activity_hours, int)
+        or isinstance(activity_hours, bool)
+        or activity_hours not in (2, 4)
+    ):
+        raise ValueError("Configuration activity_hours must be 2 or 4.")
+
+    if "start_times" in config:
+        raw_start_times = config["start_times"]
+        if not isinstance(raw_start_times, list):
+            raise ValueError("Configuration start_times must be a list.")
+    elif "start_time" in config and activity_hours == 2:
+        raw_start_times = [config["start_time"]]
+    else:
+        raise ValueError("Configuration must contain start_times.")
+
+    required_start_time_count = activity_hours // 2
+    if len(raw_start_times) != required_start_time_count:
+        raise ValueError(
+            f"Configuration for {activity_hours} hours must contain "
+            f"{required_start_time_count} start time(s)."
+        )
+    if any(
+        not isinstance(start_time, int)
+        or isinstance(start_time, bool)
+        or start_time not in (9, 11, 13, 15, 17, 19)
+        for start_time in raw_start_times
+    ):
+        raise ValueError("Start times must be selected from 9, 11, 13, 15, 17, 19.")
+    if len(set(raw_start_times)) != len(raw_start_times):
+        raise ValueError("Start times must be different from each other.")
+
     if not isinstance(month, int) or isinstance(month, bool) or not 1 <= month <= 12:
         raise ValueError("Configuration month must be an integer from 1 to 12.")
     if not isinstance(day, int) or isinstance(day, bool) or not 1 <= day <= 31:
         raise ValueError("Configuration day must be an integer from 1 to 31.")
-    if (
-        not isinstance(start_time, int)
-        or isinstance(start_time, bool)
-        or start_time not in (9, 11, 13, 15, 17, 19)
-    ):
-        raise ValueError("Configuration start_time must be one of 9, 11, 13, 15, 17, 19.")
+
+    show_browser = config.get("show_browser", True)
+    if not isinstance(show_browser, bool):
+        raise ValueError("Configuration show_browser must be true or false.")
 
     return ApplicationConfig(
         users=tuple(accounts),
@@ -94,5 +130,7 @@ def load_config(config_path: Path) -> ApplicationConfig:
         facility=facility.strip(),
         month=month,
         day=day,
-        start_time=start_time,
+        activity_hours=activity_hours,
+        start_times=tuple(raw_start_times),
+        show_browser=show_browser,
     )

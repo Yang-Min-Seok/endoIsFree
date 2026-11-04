@@ -180,6 +180,49 @@
 
     .date-unit { padding-bottom: 13px; color: var(--muted); }
 
+    .time-pickers {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .time-pickers[hidden] { display: none; }
+
+    .visibility-options {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .visibility-option {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin: 0;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .visibility-option:has(input:checked) {
+      border-color: var(--green);
+      background: #f0f8f3;
+    }
+
+    .visibility-option input {
+      flex: 0 0 auto;
+      width: 18px;
+      min-height: 18px;
+      height: 18px;
+      margin: 2px 0 0;
+      accent-color: var(--green);
+    }
+
+    .visibility-option strong { display: block; margin-bottom: 4px; }
+    .visibility-option small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
+
     .status {
       min-height: 24px;
       margin: 16px 0 0;
@@ -230,6 +273,7 @@
       .page { padding-top: 30px; }
       .card { padding: 18px; }
       .grid-two { grid-template-columns: 1fr; }
+      .visibility-options { grid-template-columns: 1fr; }
       .actions { align-items: stretch; flex-direction: column; }
       button { width: 100%; }
     }
@@ -324,20 +368,71 @@
         <div class="card-heading">
           <span class="step-number">4</span>
           <div>
-            <h2 id="time-heading">開始時間</h2>
-            <p class="subheading">申し込みたい時間帯を1つ選択</p>
+            <h2 id="time-heading">活動時間・開始時間</h2>
+            <p class="subheading">活動時間に応じて開始時間を選択</p>
           </div>
         </div>
-        <label for="start-time">開始時間</label>
-        <select id="start-time" name="start_time" required>
-          <option value="">時間を選択してください</option>
-          <option value="9">9:00</option>
-          <option value="11">11:00</option>
-          <option value="13">13:00</option>
-          <option value="15">15:00</option>
-          <option value="17">17:00</option>
-          <option value="19">19:00</option>
+        <label for="activity-hours">活動時間</label>
+        <select id="activity-hours" name="activity_hours" required>
+          <option value="2">2時間</option>
+          <option value="4">4時間</option>
         </select>
+        <div class="time-pickers" id="start-time-fields">
+          <div>
+            <label for="start-time-1">開始時間 1</label>
+            <select id="start-time-1" required>
+              <option value="">時間を選択してください</option>
+              <option value="9">9:00</option>
+              <option value="11">11:00</option>
+              <option value="13">13:00</option>
+              <option value="15">15:00</option>
+              <option value="17">17:00</option>
+              <option value="19">19:00</option>
+            </select>
+          </div>
+          <div id="start-time-2-field" hidden>
+            <label for="start-time-2">開始時間 2</label>
+            <select id="start-time-2" disabled>
+              <option value="">時間を選択してください</option>
+              <option value="9">9:00</option>
+              <option value="11">11:00</option>
+              <option value="13">13:00</option>
+              <option value="15">15:00</option>
+              <option value="17">17:00</option>
+              <option value="19">19:00</option>
+            </select>
+          </div>
+        </div>
+        <p class="help" id="time-help">
+          2時間の場合は1つ、4時間の場合は異なる開始時間を2つ選択してください。4時間の時間帯は連続していなくても選べます。
+        </p>
+      </section>
+
+      <section class="card" aria-labelledby="visibility-heading">
+        <div class="card-heading">
+          <span class="step-number">5</span>
+          <div>
+            <h2 id="visibility-heading">ブラウザーの表示</h2>
+            <p class="subheading">自動操作中の画面を表示するか選択</p>
+          </div>
+        </div>
+        <span class="field-label">実行方法</span>
+        <div class="visibility-options">
+          <label class="visibility-option" for="show-browser">
+            <input id="show-browser" name="show_browser" type="radio" value="true" checked>
+            <span>
+              <strong>画面を表示する</strong>
+              <small>ブラウザーの操作を確認できます。初回のデモにおすすめです。</small>
+            </span>
+          </label>
+          <label class="visibility-option" for="hide-browser">
+            <input id="hide-browser" name="show_browser" type="radio" value="false">
+            <span>
+              <strong>バックグラウンドで実行</strong>
+              <small>ブラウザー画面を表示せずに実行します。</small>
+            </span>
+          </label>
+        </div>
       </section>
 
       <section class="card" aria-labelledby="save-heading">
@@ -373,6 +468,19 @@
     const status = document.querySelector("#status");
     const downloadButton = document.querySelector("#download");
     const allowedStartTimes = new Set(["9", "11", "13", "15", "17", "19"]);
+    const activityHours = document.querySelector("#activity-hours");
+    const secondStartTimeField = document.querySelector("#start-time-2-field");
+    const secondStartTime = document.querySelector("#start-time-2");
+
+    function updateStartTimeFields() {
+      const needsSecondStartTime = activityHours.value === "4";
+      secondStartTimeField.hidden = !needsSecondStartTime;
+      secondStartTime.disabled = !needsSecondStartTime;
+      secondStartTime.required = needsSecondStartTime;
+    }
+
+    activityHours.addEventListener("change", updateStartTimeFields);
+    updateStartTimeFields();
 
     function parseAccounts(text) {
       const accounts = [];
@@ -413,7 +521,13 @@
       const facility = document.querySelector("#facility").value.trim();
       const month = Number(document.querySelector("#month").value);
       const day = Number(document.querySelector("#day").value);
-      const startTimeValue = document.querySelector("#start-time").value;
+      const activityHoursValue = Number(activityHours.value);
+      const startTimeValues = [
+        document.querySelector("#start-time-1").value,
+      ];
+      if (activityHoursValue === 4) {
+        startTimeValues.push(secondStartTime.value);
+      }
 
       if (!park) throw new Error("公園名を入力してください。");
       if (!facility) throw new Error("施設名を入力してください。");
@@ -428,8 +542,14 @@
       if (day > daysInMonth) {
         throw new Error(`${month}月に${day}日はありません。`);
       }
-      if (!allowedStartTimes.has(startTimeValue)) {
-        throw new Error("開始時間を一覧から1つ選択してください。");
+      if (activityHoursValue !== 2 && activityHoursValue !== 4) {
+        throw new Error("活動時間は2時間または4時間を選択してください。");
+      }
+      if (startTimeValues.some((value) => !allowedStartTimes.has(value))) {
+        throw new Error("活動時間に必要な開始時間をすべて選択してください。");
+      }
+      if (new Set(startTimeValues).size !== startTimeValues.length) {
+        throw new Error("2つの開始時間には異なる時間を選択してください。");
       }
 
       return {
@@ -438,7 +558,9 @@
         facility,
         month,
         day,
-        start_time: Number(startTimeValue),
+        activity_hours: activityHoursValue,
+        start_times: startTimeValues.map(Number),
+        show_browser: document.querySelector('input[name="show_browser"]:checked').value === "true",
       };
     }
 

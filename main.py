@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 
 from common.browser import open_browser
@@ -25,7 +24,11 @@ def main() -> None:
         step6.run,
         step7.run,
     )
-    with open_browser() as browser:
+    logger.info(
+        "Launching browser in %s mode.",
+        "visible" if config.show_browser else "background",
+    )
+    with open_browser(headless=not config.show_browser) as browser:
         for user_index, user in enumerate(config.users, start=1):
             logger.info(
                 "Starting workflow for account %d/%d.",
