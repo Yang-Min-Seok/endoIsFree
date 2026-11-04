@@ -20,6 +20,10 @@ v1.0.0（開発中）
 
 ### 初回セットアップ
 
+- Python 3.10以降をインストールしてください。まだ入っていない場合は [Python公式ダウンロードページ](https://www.python.org/downloads/) からインストーラーを取得します。
+- Windowsではインストール時に「Add python.exe to PATH」とPython Launcherを有効にしてください。インストール後、コマンドプロンプトで `py -3 --version` を実行して確認します。
+- macOS / Linuxではターミナルで `python3 --version` を実行して確認します。
+
 - macOS / Linux:
   1. `python3 -m pip install -r requirements.txt`
   2. `python3 -m playwright install chromium`

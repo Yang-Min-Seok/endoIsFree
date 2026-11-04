@@ -5,12 +5,15 @@ from common.browser import open_browser
 from common.config import load_config
 from common.context import ExecutionContext
 from common.logging_config import configure_logging
-from steps import step1, step2, step3, step4, step5, step6, step7
+from steps import step0, step1, step2, step3, step4, step5, step6, step7
 
 
 def main() -> None:
     project_root = Path(__file__).resolve().parent
     logger = configure_logging(project_root)
+    if not step0.ask_for_confirmation(logger):
+        return
+
     config = load_config(project_root / "endoCustom" / "endoCustom.json")
 
     steps = (
