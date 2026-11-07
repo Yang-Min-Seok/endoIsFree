@@ -1,3 +1,4 @@
+import time
 from typing import Optional
 
 from common.browser import SITE_ACTION_TIMEOUT_MS
@@ -7,6 +8,7 @@ USE_DATE_TABLE_SELECTOR = "#usedate-table"
 NEXT_WEEK_BUTTON_SELECTOR = "#next-week"
 APPLICATION_BUTTON_SELECTOR = "#btn-go"
 MAX_WEEKS_TO_SEARCH = 52
+APPLICATION_ACTION_DELAY_SECONDS = 5
 
 
 def _week_dates(context: ExecutionContext) -> tuple[str, ...]:
@@ -176,6 +178,17 @@ def run(context: ExecutionContext) -> None:
         context.application_round_count,
     )
 
+    context.logger.info(
+        "Waiting %d seconds after selecting the date and time before "
+        "clicking the application button.",
+        APPLICATION_ACTION_DELAY_SECONDS,
+    )
+    time.sleep(APPLICATION_ACTION_DELAY_SECONDS)
+    context.logger.info(
+        "Wait complete. Clicking the application button for %s at %s.",
+        expected_date_fragment,
+        expected_time,
+    )
     with context.page.expect_navigation(
         wait_until="domcontentloaded",
         timeout=SITE_ACTION_TIMEOUT_MS,

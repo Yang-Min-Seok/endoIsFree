@@ -1,5 +1,9 @@
+import time
+
 from common.browser import SITE_ACTION_TIMEOUT_MS
 from common.context import ExecutionContext
+
+INPUT_ACTION_DELAY_SECONDS = 5
 
 
 def run(context: ExecutionContext) -> None:
@@ -9,7 +13,19 @@ def run(context: ExecutionContext) -> None:
         context.user_count,
     )
     context.page.locator("#userId").fill(context.user.user_number)
+    context.logger.info(
+        "User number entered. Waiting %d seconds before entering password.",
+        INPUT_ACTION_DELAY_SECONDS,
+    )
+    time.sleep(INPUT_ACTION_DELAY_SECONDS)
+    context.logger.info("Wait complete. Entering the password.")
     context.page.locator("#password").fill(context.user.password)
+    context.logger.info(
+        "Password entered. Waiting %d seconds before submitting login.",
+        INPUT_ACTION_DELAY_SECONDS,
+    )
+    time.sleep(INPUT_ACTION_DELAY_SECONDS)
+    context.logger.info("Wait complete. Submitting login.")
 
     with context.page.expect_navigation(
         wait_until="domcontentloaded",

@@ -1,9 +1,12 @@
+import time
+
 from common.browser import SITE_ACTION_TIMEOUT_MS
 from common.context import ExecutionContext
 
 PARK_SELECT_SELECTOR = "#bname"
 FACILITY_SELECT_SELECTOR = "#iname"
 USE_DATE_TABLE_SELECTOR = "#usedate-table"
+PARK_SELECTION_WAIT_SECONDS = 10
 
 
 def _selected_label(context: ExecutionContext, selector: str) -> str:
@@ -47,7 +50,12 @@ def run(context: ExecutionContext) -> None:
         raise RuntimeError(
             f"Selected park does not match configuration: {selected_park!r}."
         )
-    context.logger.info("Selected park: %s.", selected_park)
+    context.logger.info(
+        "Selected park: %s. Waiting %d seconds before selecting the facility.",
+        selected_park,
+        PARK_SELECTION_WAIT_SECONDS,
+    )
+    time.sleep(PARK_SELECTION_WAIT_SECONDS)
 
     context.page.wait_for_function(
         """facilityName => {
