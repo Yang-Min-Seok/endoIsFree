@@ -6,6 +6,7 @@ LOTTERY_CATEGORY = "テニス（人工芝）"
 
 
 def run(context: ExecutionContext) -> None:
+    context.workflow_state.current_process = "抽選分類一覧を待つ"
     context.logger.info(
         "step4 called! Selecting %s for account %d/%d.",
         LOTTERY_CATEGORY,
@@ -19,6 +20,7 @@ def run(context: ExecutionContext) -> None:
     category_cells = table.locator("tbody td.sp-top").filter(
         has_text=LOTTERY_CATEGORY
     )
+    context.workflow_state.current_process = "テニス（人工芝）の抽選枠を特定"
     matching_cells = [
         cell
         for cell in category_cells.all()
@@ -31,6 +33,7 @@ def run(context: ExecutionContext) -> None:
         )
 
     row = matching_cells[0].locator("xpath=ancestor::tr")
+    context.workflow_state.current_process = "抽選受付中か確認"
     status_text = row.locator("td.status").inner_text().strip()
     if status_text != "受付中":
         raise RuntimeError(
@@ -39,6 +42,7 @@ def run(context: ExecutionContext) -> None:
         )
 
     apply_button = row.locator("td.request button").filter(has_text="申込み")
+    context.workflow_state.current_process = "抽選分類を選択して画面遷移"
     apply_button.wait_for(state="visible", timeout=SITE_ACTION_TIMEOUT_MS)
     with context.page.expect_navigation(
         wait_until="domcontentloaded",
@@ -59,6 +63,7 @@ def run(context: ExecutionContext) -> None:
         "&& document.body.innerText.trim().length > 0",
         timeout=SITE_ACTION_TIMEOUT_MS,
     )
+    context.workflow_state.current_process = "公園選択欄の準備を確認"
     context.page.wait_for_load_state(
         "load",
         timeout=SITE_ACTION_TIMEOUT_MS,

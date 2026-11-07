@@ -1,84 +1,45 @@
 import re
+import time
 
+from common.application_completion import (
+    has_application_completion_message,
+)
 from common.browser import SITE_ACTION_TIMEOUT_MS
 from common.context import ExecutionContext
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Dialog
 
 APPLICATION_SUMMARY_SELECTOR = "table.table.sp-block-table"
 APPLICATION_SELECT_SELECTOR = "#apply"
 APPLICATION_BUTTON_SELECTOR = "#btn-go"
 EXPECTED_HEADERS = ("分類", "公園", "施設", "利用日", "時間", "利用面数")
-CELL_LABELS = ("分類：", "公園：", "施設：", "利用日：", "利用時間：", "利用面数：")
+SUBMISSION_CONFIRMATION_MESSAGE = "抽選申込処理を行います。よろしいですか？"
+SITE_COMMUNICATION_ERROR_MESSAGE = "データ通信を正しく行うことができませんでした"
 APPLICATION_CATEGORY = "テニス（人工芝）"
 COURT_COUNT = "1面"
+SUMMARY_CELL_LABELS = ("分類：", "公園：", "施設：", "利用日：", "利用時間：", "利用面数：")
+APPLICATION_ACTION_DELAY_SECONDS = 5
 
 
 def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", "", value)
 
 
-def _expected_time_label(context: ExecutionContext) -> str:
-    start_time = context.config.start_times[
-        context.application_round - 1
-        if context.config.activity_hours == 4
-        else 0
-    ]
-    return f"{start_time:02d}時00分～{start_time + 2:02d}時00分"
-
-
-def _expected_summary_values(context: ExecutionContext) -> tuple[str, ...]:
-    return (
-        APPLICATION_CATEGORY,
-        context.config.park,
-        context.config.facility,
-        f"{context.config.month}月{context.config.day}日",
-        _expected_time_label(context),
-        COURT_COUNT,
-    )
-
-
 def _read_application_summary(context: ExecutionContext) -> tuple[str, ...]:
-    try:
-        context.page.wait_for_function(
-            """({selector, expectedHeaders, cellLabels, expectedValues}) => {
+    context.page.wait_for_function(
+        """({selector, expectedHeaders}) => {
             return Array.from(document.querySelectorAll(selector)).some(table => {
                 const headers = Array.from(table.querySelectorAll("thead th"))
                     .map(header => header.textContent.replace(/\\s/g, ""));
-                if (JSON.stringify(headers) !== JSON.stringify(expectedHeaders)) {
-                    return false;
-                }
-                const rows = table.querySelectorAll("tbody tr");
-                if (rows.length !== 1) return false;
-                const cells = Array.from(rows[0].querySelectorAll("td"));
-                if (cells.length !== expectedValues.length) return false;
-                return cells.every((cell, index) => {
-                    let actual = cell.textContent.replace(/\\s/g, "");
-                    const label = cellLabels[index];
-                    if (actual.startsWith(label)) {
-                        actual = actual.slice(label.length);
-                    }
-                    return index === 3
-                        ? actual.includes(expectedValues[index])
-                        : actual === expectedValues[index];
-                });
+                return JSON.stringify(headers) === JSON.stringify(expectedHeaders)
+                    && table.querySelectorAll("tbody tr").length === 1;
             });
-            }""",
-            arg={
-                "selector": APPLICATION_SUMMARY_SELECTOR,
-                "expectedHeaders": list(EXPECTED_HEADERS),
-                "cellLabels": list(CELL_LABELS),
-                "expectedValues": [
-                    _normalize_text(value)
-                    for value in _expected_summary_values(context)
-                ],
-            },
-            timeout=SITE_ACTION_TIMEOUT_MS,
-        )
-    except PlaywrightTimeoutError as error:
-        raise RuntimeError(
-            "The application summary did not update to match the configured "
-            "request before the timeout. No application was submitted."
-        ) from error
+        }""",
+        arg={
+            "selector": APPLICATION_SUMMARY_SELECTOR,
+            "expectedHeaders": list(EXPECTED_HEADERS),
+        },
+        timeout=SITE_ACTION_TIMEOUT_MS,
+    )
 
     tables = context.page.locator(APPLICATION_SUMMARY_SELECTOR)
     matching_tables = []
@@ -122,16 +83,33 @@ def _read_application_summary(context: ExecutionContext) -> tuple[str, ...]:
     return tuple(values)
 
 
+def _expected_application_values(
+    context: ExecutionContext,
+) -> tuple[str, ...]:
+    start_time = context.config.start_times[
+        context.application_round - 1
+        if context.config.activity_hours == 4
+        else 0
+    ]
+    return (
+        APPLICATION_CATEGORY,
+        context.config.park,
+        context.config.facility,
+        f"{context.config.month}月{context.config.day}日",
+        f"{start_time:02d}時00分～{start_time + 2:02d}時00分",
+        COURT_COUNT,
+    )
+
+
 def _validate_application_summary(
     context: ExecutionContext,
     summary: tuple[str, ...],
 ) -> None:
-    expected_values = _expected_summary_values(context)
     mismatches = []
     for label, header, expected, actual in zip(
-        CELL_LABELS,
+        SUMMARY_CELL_LABELS,
         EXPECTED_HEADERS,
-        expected_values,
+        _expected_application_values(context),
         summary,
     ):
         if actual.startswith(label):
@@ -152,7 +130,36 @@ def _validate_application_summary(
         )
 
 
+def _handle_submission_dialog(
+    dialog: Dialog,
+    dialog_events: list[tuple[str, str]],
+    context: ExecutionContext,
+) -> None:
+    message = dialog.message
+    dialog_events.append((dialog.type, message))
+    expected_message = _normalize_text(SUBMISSION_CONFIRMATION_MESSAGE)
+    if (
+        dialog.type == "alert"
+        and SITE_COMMUNICATION_ERROR_MESSAGE in message
+    ):
+        context.workflow_state.site_communication_error = True
+        dialog.accept()
+        return
+    if (
+        dialog.type == "confirm"
+        and _normalize_text(message) == expected_message
+    ):
+        if context.workflow_state.site_communication_error:
+            dialog.dismiss()
+        else:
+            context.workflow_state.step7_confirmation_accepted = True
+            dialog.accept()
+    else:
+        dialog.dismiss()
+
+
 def run(context: ExecutionContext) -> None:
+    context.workflow_state.current_process = "申込み回と開始時刻の設定を確認"
     if not 1 <= context.application_round <= context.application_round_count:
         raise ValueError(
             f"Application round must be between 1 and "
@@ -170,16 +177,23 @@ def run(context: ExecutionContext) -> None:
         )
 
     context.logger.info(
-        "step7 called! Verifying application %d/%d for account %d/%d.",
+        "step7 called! Processing application %d/%d for account %d/%d.",
         context.application_round,
         context.application_round_count,
         context.user_index,
         context.user_count,
     )
+    context.workflow_state.current_process = "サイトに表示された申込み内容を読み取る"
     summary = _read_application_summary(context)
+    context.logger.info(
+        "Application summary shown by the site: %s.",
+        dict(zip(EXPECTED_HEADERS, summary)),
+    )
+    context.workflow_state.current_process = "サイトの申込み内容と設定を照合"
     _validate_application_summary(context, summary)
     context.logger.info("Application summary matches the configured request.")
 
+    context.workflow_state.current_process = "申込み番号の選択肢を待つ"
     application_select = context.page.locator(APPLICATION_SELECT_SELECTOR)
     application_select.wait_for(
         state="visible",
@@ -208,6 +222,7 @@ def run(context: ExecutionContext) -> None:
         value=expected_option_value,
         timeout=SITE_ACTION_TIMEOUT_MS,
     )
+    context.workflow_state.current_process = "選択した申込み番号を確認"
     selected_value = application_select.input_value()
     if selected_value != expected_option_value:
         raise RuntimeError(
@@ -215,36 +230,99 @@ def run(context: ExecutionContext) -> None:
             f"but selected value is {selected_value!r}."
         )
 
+    context.logger.info(
+        "Waiting %d seconds after selecting the application number before "
+        "clicking the final application button.",
+        APPLICATION_ACTION_DELAY_SECONDS,
+    )
+    context.workflow_state.current_process = "申込みボタンをクリックする前に待機"
+    time.sleep(APPLICATION_ACTION_DELAY_SECONDS)
+    context.logger.info(
+        "Wait complete. Clicking the final application button for %s.",
+        expected_option_label,
+    )
+    context.workflow_state.current_process = "申込みボタンを押す準備"
     application_button = context.page.locator(APPLICATION_BUTTON_SELECTOR)
     application_button.wait_for(
         state="visible",
         timeout=SITE_ACTION_TIMEOUT_MS,
     )
-    with context.page.expect_navigation(
-        wait_until="domcontentloaded",
-        timeout=SITE_ACTION_TIMEOUT_MS,
-    ) as navigation:
-        application_button.click(timeout=SITE_ACTION_TIMEOUT_MS)
+    dialog_events: list[tuple[str, str]] = []
 
-    response = navigation.value
-    if response is not None and response.status >= 400:
-        raise RuntimeError(
-            "Application submission returned an unsuccessful HTTP status: "
-            f"{response.status} ({context.page.url})."
+    def dialog_handler(dialog: Dialog) -> None:
+        _handle_submission_dialog(dialog, dialog_events, context)
+
+    context.page.on("dialog", dialog_handler)
+    try:
+        context.workflow_state.current_process = (
+            "申込みボタンを押してサイト確認ダイアログを処理"
         )
-    context.page.wait_for_function(
-        "() => document.readyState !== 'loading' "
-        "&& document.body !== null "
-        "&& document.body.innerText.trim().length > 0",
-        timeout=SITE_ACTION_TIMEOUT_MS,
-    )
-    context.logger.info(
-        "Application submitted for account %d/%d, application %d/%d; "
-        "destination document loaded: %s (HTTP %s).",
-        context.user_index,
-        context.user_count,
-        context.application_round,
-        context.application_round_count,
-        context.page.url,
-        response.status if response is not None else "no response",
-    )
+        with context.page.expect_navigation(
+            wait_until="domcontentloaded",
+            timeout=SITE_ACTION_TIMEOUT_MS,
+        ) as navigation:
+            application_button.click(timeout=SITE_ACTION_TIMEOUT_MS)
+
+        context.workflow_state.current_process = "申込み後の遷移先を確認"
+        response = navigation.value
+        response_status = response.status if response is not None else None
+        if response_status is not None and response_status >= 400:
+            raise RuntimeError(
+                "Application submission returned an unsuccessful HTTP status: "
+                f"{response_status} ({context.page.url})."
+            )
+        context.page.wait_for_function(
+            "() => document.readyState !== 'loading' "
+            "&& document.body !== null "
+            "&& document.body.innerText.trim().length > 0",
+            timeout=SITE_ACTION_TIMEOUT_MS,
+        )
+
+        if has_application_completion_message(context.page):
+            context.workflow_state.application_success_confirmed = True
+            context.logger.info(
+                "The application completion message appeared directly after "
+                "step7 for account %d/%d, application %d/%d; page: %s.",
+                context.user_index,
+                context.user_count,
+                context.application_round,
+                context.application_round_count,
+                context.page.url,
+            )
+            return
+
+        if context.workflow_state.site_communication_error:
+            raise RuntimeError(
+                "The site displayed a communication error before the final "
+                "confirmation was accepted."
+            )
+
+        if (
+            len(dialog_events) != 1
+            or dialog_events[0][0] != "confirm"
+            or _normalize_text(dialog_events[0][1])
+            != _normalize_text(SUBMISSION_CONFIRMATION_MESSAGE)
+        ):
+            raise RuntimeError(
+                "The expected final application confirmation dialog was not "
+                "accepted, or an unexpected dialog appeared. "
+                f"Observed dialogs: {dialog_events!r}."
+            )
+        context.logger.info(
+            "Accepted the step7 confirmation dialog. The final confirmation "
+            "page will be handed off to the user in step8."
+        )
+
+        context.workflow_state.current_process = "最終確認ページへの遷移を確認"
+        context.logger.info(
+            "Step7 is ready for manual final confirmation for account %d/%d, "
+            "application %d/%d; page: %s (HTTP %s).",
+            context.user_index,
+            context.user_count,
+            context.application_round,
+            context.application_round_count,
+            context.page.url,
+            response_status if response_status is not None else "no response",
+        )
+    finally:
+        context.page.remove_listener("dialog", dialog_handler)

@@ -1,3 +1,5 @@
+import time
+
 from common.browser import SITE_ACTION_TIMEOUT_MS
 from common.context import ExecutionContext
 
@@ -7,21 +9,39 @@ LOTTERY_MENU_SELECTOR = (
 LOTTERY_APPLICATION_LINK_SELECTOR = (
     'a[href="javascript:doAction(document.form1, gLotWOpeLotSearchAction);"]'
 )
+LOTTERY_ACTION_DELAY_SECONDS = 5
 
 
 def run(context: ExecutionContext) -> None:
+    context.workflow_state.current_process = "抽選メニューを開く前の待機"
     context.logger.info(
         "step3 called! Opening the lottery menu for account %d/%d.",
         context.user_index,
         context.user_count,
     )
+    context.logger.info(
+        "Waiting %d seconds before clicking the lottery navigation.",
+        LOTTERY_ACTION_DELAY_SECONDS,
+    )
+    time.sleep(LOTTERY_ACTION_DELAY_SECONDS)
+    context.logger.info("Wait complete. Clicking the lottery navigation.")
+    context.workflow_state.current_process = "抽選メニューを選択"
     context.page.locator(LOTTERY_MENU_SELECTOR).filter(has_text="抽選").click(
         timeout=SITE_ACTION_TIMEOUT_MS
     )
 
+    context.workflow_state.current_process = "抽選申込みリンクの表示を待つ"
     application_link = context.page.locator(LOTTERY_APPLICATION_LINK_SELECTOR)
     application_link.wait_for(state="visible", timeout=SITE_ACTION_TIMEOUT_MS)
 
+    context.logger.info(
+        "Waiting %d seconds before clicking the lottery application link.",
+        LOTTERY_ACTION_DELAY_SECONDS,
+    )
+    context.workflow_state.current_process = "抽選申込みリンクのクリック前に待機"
+    time.sleep(LOTTERY_ACTION_DELAY_SECONDS)
+    context.logger.info("Wait complete. Clicking the lottery application link.")
+    context.workflow_state.current_process = "抽選申込みページへ移動"
     with context.page.expect_navigation(
         wait_until="domcontentloaded",
         timeout=SITE_ACTION_TIMEOUT_MS,
@@ -41,6 +61,7 @@ def run(context: ExecutionContext) -> None:
         "&& document.body.innerText.trim().length > 0",
         timeout=SITE_ACTION_TIMEOUT_MS,
     )
+    context.workflow_state.current_process = "抽選申込みページの表示を確認"
     context.logger.info(
         "Lottery application page rendered successfully: %s (HTTP %s).",
         context.page.url,

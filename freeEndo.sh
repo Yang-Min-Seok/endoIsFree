@@ -3,4 +3,8 @@
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$SCRIPT_DIR" || exit 1
 
-exec python3 main.py "$@"
+if [ "$(uname -s)" = "Darwin" ]; then
+    caffeinate -i python3 main.py "$@"
+else
+    python3 main.py "$@"
+fi

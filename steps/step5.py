@@ -1,9 +1,12 @@
+import time
+
 from common.browser import SITE_ACTION_TIMEOUT_MS
 from common.context import ExecutionContext
 
 PARK_SELECT_SELECTOR = "#bname"
 FACILITY_SELECT_SELECTOR = "#iname"
 USE_DATE_TABLE_SELECTOR = "#usedate-table"
+PARK_SELECTION_WAIT_SECONDS = 10
 
 
 def _selected_label(context: ExecutionContext, selector: str) -> str:
@@ -14,6 +17,7 @@ def _selected_label(context: ExecutionContext, selector: str) -> str:
 
 
 def run(context: ExecutionContext) -> None:
+    context.workflow_state.current_process = "公園・施設選択画面を待つ"
     context.logger.info(
         "step5 called! Selecting park and facility for account %d/%d.",
         context.user_index,
@@ -38,6 +42,7 @@ def run(context: ExecutionContext) -> None:
         arg=context.config.park,
         timeout=SITE_ACTION_TIMEOUT_MS,
     )
+    context.workflow_state.current_process = "設定した公園を選択"
     park_select.select_option(
         label=context.config.park,
         timeout=SITE_ACTION_TIMEOUT_MS,
@@ -47,7 +52,13 @@ def run(context: ExecutionContext) -> None:
         raise RuntimeError(
             f"Selected park does not match configuration: {selected_park!r}."
         )
-    context.logger.info("Selected park: %s.", selected_park)
+    context.logger.info(
+        "Selected park: %s. Waiting %d seconds before selecting the facility.",
+        selected_park,
+        PARK_SELECTION_WAIT_SECONDS,
+    )
+    context.workflow_state.current_process = "施設選択肢が表示されるまで待つ"
+    time.sleep(PARK_SELECTION_WAIT_SECONDS)
 
     context.page.wait_for_function(
         """facilityName => {
@@ -62,6 +73,7 @@ def run(context: ExecutionContext) -> None:
         timeout=SITE_ACTION_TIMEOUT_MS,
     )
     facility_select = context.page.locator(FACILITY_SELECT_SELECTOR)
+    context.workflow_state.current_process = "設定した施設を選択"
     facility_select.select_option(
         label=context.config.facility,
         timeout=SITE_ACTION_TIMEOUT_MS,
@@ -74,6 +86,7 @@ def run(context: ExecutionContext) -> None:
         )
     context.logger.info("Selected facility: %s.", selected_facility)
 
+    context.workflow_state.current_process = "利用日一覧の表示を確認"
     table = context.page.locator(USE_DATE_TABLE_SELECTOR)
     table.wait_for(state="visible", timeout=SITE_ACTION_TIMEOUT_MS)
     context.page.wait_for_function(
