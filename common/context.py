@@ -16,3 +16,5 @@ class ExecutionContext:
     user_index: int
     user_count: int
     config: ApplicationConfig
+    application_round: int
+    application_round_count: int

@@ -24,32 +24,38 @@ def main() -> None:
         step6.run,
         step7.run,
     )
+    application_round_count = 2
     logger.info(
         "Launching browser in %s mode.",
         "visible" if config.show_browser else "background",
     )
     with open_browser(headless=not config.show_browser) as browser:
         for user_index, user in enumerate(config.users, start=1):
-            logger.info(
-                "Starting workflow for account %d/%d.",
-                user_index,
-                len(config.users),
-            )
-            browser_context = browser.new_context()
-            try:
-                context = ExecutionContext(
-                    project_root=project_root,
-                    logger=logger,
-                    page=browser_context.new_page(),
-                    user=user,
-                    user_index=user_index,
-                    user_count=len(config.users),
-                    config=config,
+            for application_round in range(1, application_round_count + 1):
+                logger.info(
+                    "Starting workflow for account %d/%d, application %d/%d.",
+                    user_index,
+                    len(config.users),
+                    application_round,
+                    application_round_count,
                 )
-                for run_step in steps:
-                    run_step(context)
-            finally:
-                browser_context.close()
+                browser_context = browser.new_context()
+                try:
+                    context = ExecutionContext(
+                        project_root=project_root,
+                        logger=logger,
+                        page=browser_context.new_page(),
+                        user=user,
+                        user_index=user_index,
+                        user_count=len(config.users),
+                        config=config,
+                        application_round=application_round,
+                        application_round_count=application_round_count,
+                    )
+                    for run_step in steps:
+                        run_step(context)
+                finally:
+                    browser_context.close()
 
 
 if __name__ == "__main__":
