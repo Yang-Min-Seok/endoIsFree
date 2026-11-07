@@ -220,6 +220,7 @@ def run(context: ExecutionContext) -> None:
         state="visible",
         timeout=SITE_ACTION_TIMEOUT_MS,
     )
+    context.workflow_state.final_submission_started = True
     with context.page.expect_navigation(
         wait_until="domcontentloaded",
         timeout=SITE_ACTION_TIMEOUT_MS,
