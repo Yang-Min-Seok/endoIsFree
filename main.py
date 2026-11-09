@@ -223,13 +223,17 @@ def main() -> None:
                                 outcomes[
                                     (user_index, application_round)
                                 ] = "失敗"
-                                raise RuntimeError(
-                                    "The workflow failed after "
-                                    f"{MAX_WORKFLOW_RETRIES} retries for "
-                                    f"account {user_index}/{len(config.users)}, "
-                                    f"application {application_round}/"
-                                    f"{application_round_count}: {error}"
-                                ) from error
+                                logger.error(
+                                    "利用者 %d/%d の申込 %d/%d は%d回の再試行後も"
+                                    "失敗しました（%s）。次の申込へ進みます。",
+                                    user_index,
+                                    len(config.users),
+                                    application_round,
+                                    application_round_count,
+                                    MAX_WORKFLOW_RETRIES,
+                                    error,
+                                )
+                                break
                             logger.warning(
                                 "Workflow failed for account %d/%d, "
                                 "application %d/%d: %s Restarting from step1 "

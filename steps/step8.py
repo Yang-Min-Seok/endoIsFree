@@ -7,7 +7,7 @@ from common.application_completion import (
 )
 from common.browser import SITE_ACTION_TIMEOUT_MS
 from common.context import ApplicationCompletionNotConfirmed, ExecutionContext
-from common.notification import play_page_loaded_sound
+from common.notification import start_user_action_reminder
 
 USER_ACTION_REMINDER_SECONDS = 60
 
@@ -39,15 +39,16 @@ def run(context: ExecutionContext) -> None:
         )
 
     context.page.on("dialog", dialog_handler)
+    stop_reminder_sound = start_user_action_reminder(context.logger)
     try:
         while True:
             context.workflow_state.current_process = (
-                "ユーザーによる最終確認を待ち、60秒ごとに通知"
+                "ユーザーによる最終確認を待ち、通知音を再生"
             )
-            play_page_loaded_sound(context.logger)
             context.logger.info(
                 "Waiting for the user to complete the final confirmation. "
-                "A reminder will sound again in %d seconds.",
+                "The sound loops continuously where supported; otherwise "
+                "it repeats every %d seconds.",
                 USER_ACTION_REMINDER_SECONDS,
             )
             try:
@@ -61,6 +62,10 @@ def run(context: ExecutionContext) -> None:
                     raise RuntimeError(
                         "The browser page was closed before the user completed "
                         "the final confirmation."
+                    )
+                if stop_reminder_sound is None:
+                    stop_reminder_sound = start_user_action_reminder(
+                        context.logger
                     )
                 context.logger.info(
                     "No final-confirmation navigation detected; reminding "
@@ -101,4 +106,6 @@ def run(context: ExecutionContext) -> None:
             )
             return
     finally:
+        if stop_reminder_sound is not None:
+            stop_reminder_sound()
         context.page.remove_listener("dialog", dialog_handler)
