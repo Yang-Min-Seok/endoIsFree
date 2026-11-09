@@ -9,7 +9,7 @@ from common.browser import SITE_ACTION_TIMEOUT_MS
 from common.context import ApplicationCompletionNotConfirmed, ExecutionContext
 from common.notification import play_page_loaded_sound
 
-USER_ACTION_REMINDER_SECONDS = 10
+USER_ACTION_REMINDER_SECONDS = 60
 
 
 def run(context: ExecutionContext) -> None:
@@ -42,7 +42,7 @@ def run(context: ExecutionContext) -> None:
     try:
         while True:
             context.workflow_state.current_process = (
-                "ユーザーによる最終確認を待ち、10秒ごとに通知"
+                "ユーザーによる最終確認を待ち、60秒ごとに通知"
             )
             play_page_loaded_sound(context.logger)
             context.logger.info(
