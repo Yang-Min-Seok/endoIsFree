@@ -24,23 +24,25 @@ if errorlevel 1 (
     goto :failed
 )
 
-set "WORKTREE_DIRTY="
-for /f "delims=" %%A in ('git status --porcelain') do set "WORKTREE_DIRTY=1"
-if defined WORKTREE_DIRTY (
-    echo Error: local changes found; update stopped to avoid overwriting them.
-    goto :failed
-)
-
 echo Fetching updates from origin...
 git fetch origin
 if errorlevel 1 goto :failed
 
-echo Switching to main...
-git checkout main
+git rev-parse --verify --quiet refs/remotes/origin/main >nul 2>&1
+if errorlevel 1 (
+    echo Error: origin/main was not found after fetching.
+    goto :failed
+)
+
+echo Resetting main to origin/main...
+git checkout -f -B main origin/main
 if errorlevel 1 goto :failed
 
-echo Fast-forwarding main from origin...
-git pull --ff-only origin main
+git reset --hard origin/main
+if errorlevel 1 goto :failed
+
+echo Removing untracked, non-ignored files...
+git clean -fd
 if errorlevel 1 goto :failed
 
 echo Update completed.

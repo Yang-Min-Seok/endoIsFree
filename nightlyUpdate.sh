@@ -16,19 +16,20 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ -n "$(git status --porcelain)" ]; then
-    echo "Error: local changes found; update stopped to avoid overwriting them." >&2
-    exit 1
-fi
-
 echo "Fetching updates from origin..."
 git fetch origin || exit 1
 
-echo "Switching to main..."
-git checkout main || exit 1
+if ! git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null; then
+    echo "Error: origin/main was not found after fetching." >&2
+    exit 1
+fi
 
-echo "Fast-forwarding main from origin..."
-git pull --ff-only origin main || exit 1
+echo "Resetting main to origin/main..."
+git checkout -f -B main origin/main || exit 1
+git reset --hard origin/main || exit 1
+
+echo "Removing untracked, non-ignored files..."
+git clean -fd || exit 1
 
 echo "Update completed."
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Update finished successfully."
