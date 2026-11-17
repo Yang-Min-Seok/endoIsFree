@@ -1,10 +1,10 @@
-from common.context import ExecutionContext
+from common.context import CommonExecutionContext
 from common.browser import SITE_ACTION_TIMEOUT_MS
 
 TOP_PAGE_URL = "https://kouen.sports.metro.tokyo.lg.jp/web/"
 
 
-def run(context: ExecutionContext) -> None:
+def run(context: CommonExecutionContext) -> None:
     context.workflow_state.current_process = "予約サイトのトップページを開く"
     context.logger.info(
         "step1 called! Opening the reservation site for account %d/%d.",

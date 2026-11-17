@@ -1,12 +1,12 @@
 import time
 
 from common.browser import SITE_ACTION_TIMEOUT_MS
-from common.context import ExecutionContext
+from common.context import CommonExecutionContext
 
 INPUT_ACTION_DELAY_SECONDS = 5
 
 
-def run(context: ExecutionContext) -> None:
+def run(context: CommonExecutionContext) -> None:
     context.workflow_state.current_process = "利用者番号を入力"
     context.logger.info(
         "step2 called! Logging in with account %d/%d.",

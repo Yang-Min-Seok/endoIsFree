@@ -28,7 +28,7 @@ if ($previousState -eq 0) {
 $exitCode = 1
 try {
     $mainScript = Join-Path $PSScriptRoot "main.py"
-    & py -3 $mainScript @PythonArguments
+    & py -3 $mainScript free @PythonArguments
     $exitCode = $LASTEXITCODE
 }
 finally {

@@ -21,14 +21,18 @@ class WorkflowState:
 
 
 @dataclass(frozen=True)
-class ExecutionContext:
+class CommonExecutionContext:
     project_root: Path
     logger: logging.Logger
     page: Page
     user: UserAccount
     user_index: int
     user_count: int
+    workflow_state: WorkflowState
+
+
+@dataclass(frozen=True)
+class ExecutionContext(CommonExecutionContext):
     config: ApplicationConfig
     application_round: int
     application_round_count: int
-    workflow_state: WorkflowState = field(default_factory=WorkflowState)

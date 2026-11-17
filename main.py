@@ -1,21 +1,30 @@
+import argparse
 import logging
 import time
 from pathlib import Path
 from typing import Callable
 
 from common.browser import open_browser
+from common.check_config import CheckConfig, load_check_config
 from common.config import ApplicationConfig, load_config
 from common.context import (
     ApplicationCompletionNotConfirmed,
+    CommonExecutionContext,
     ExecutionContext,
     WorkflowState,
 )
 from common.logging_config import configure_logging
 from playwright.sync_api import Page
-from steps import (
+from commonSteps import step1 as common_step1
+from commonSteps import step2 as common_step2
+from checkSteps import step3 as check_step3
+from checkSteps import step4 as check_step4
+from checkSteps import step5 as check_step5
+from checkSteps import step6 as check_step6
+from checkSteps import step7 as check_step7
+from checkSteps import step8 as check_step8
+from freeSteps import (
     step0,
-    step1,
-    step2,
     step3,
     step4,
     step5,
@@ -27,6 +36,8 @@ from steps import (
 MAX_WORKFLOW_RETRIES = 3
 WORKFLOW_RETRY_DELAY_SECONDS = 5
 STEP_START_DELAY_SECONDS = 10
+MAX_CHECK_RETRIES = 3
+CHECK_RETRY_DELAY_SECONDS = 5
 APPLICATION_ROUND_COUNT = 2
 SYSTEM_ERROR_SELECTOR = "#sys-error"
 SYSTEM_ERROR_MESSAGE = "データ通信を正しく行うことができませんでした"
@@ -134,9 +145,9 @@ def _log_final_summary(
     logger.info("====================================")
 
 
-def main() -> None:
+def run_free() -> None:
     project_root = Path(__file__).resolve().parent
-    logger = configure_logging(project_root)
+    logger = configure_logging(project_root, "free")
     try:
         if not step0.ask_for_confirmation(logger):
             return
@@ -149,10 +160,10 @@ def main() -> None:
         )
         raise
 
-    config = load_config(project_root / "endoCustom" / "endoCustom.json")
+    config = load_config(project_root / "endoCustom" / "freeConfig.json")
     steps = (
-        step1.run,
-        step2.run,
+        common_step1.run,
+        common_step2.run,
         step3.run,
         step4.run,
         step5.run,
@@ -279,6 +290,145 @@ def main() -> None:
             if outcome == "処理中":
                 outcomes[key] = "中断"
         _log_final_summary(logger, config, outcomes)
+
+
+def _log_check_summary(
+    logger: logging.Logger,
+    config: CheckConfig,
+    outcomes: dict[int, str],
+) -> None:
+    logger.info("========== 最終実行結果 ==========")
+    logger.info("| 利用者番号 | 結果 |")
+    logger.info("| --- | --- |")
+    for user_index, user in enumerate(config.users, start=1):
+        logger.info("| %s | %s |", user.user_number, outcomes[user_index])
+    logger.info("====================================")
+
+
+def run_check() -> None:
+    project_root = Path(__file__).resolve().parent
+    logger = configure_logging(project_root, "check")
+    config = load_check_config(project_root / "endoCustom" / "checkConfig.json")
+    steps = (
+        common_step1.run,
+        common_step2.run,
+        check_step3.run,
+        check_step4.run,
+        check_step5.run,
+        check_step6.run,
+        check_step7.run,
+        check_step8.run,
+    )
+    outcomes = {
+        user_index: "未確認（結果確認ステップ未実装）"
+        for user_index in range(1, len(config.users) + 1)
+    }
+
+    try:
+        logger.info("Launching browser in visible mode.")
+        with open_browser(headless=False) as browser:
+            for user_index, user in enumerate(config.users, start=1):
+                for attempt in range(1, MAX_CHECK_RETRIES + 2):
+                    logger.info(
+                        "Starting workflow for account %d/%d (attempt %d/%d).",
+                        user_index,
+                        len(config.users),
+                        attempt,
+                        MAX_CHECK_RETRIES + 1,
+                    )
+                    browser_context = None
+                    execution_context = None
+                    current_step = "step1"
+                    current_process = "ブラウザーセッションを開始"
+                    try:
+                        browser_context = browser.new_context()
+                        execution_context = CommonExecutionContext(
+                            project_root=project_root,
+                            logger=logger,
+                            page=browser_context.new_page(),
+                            user=user,
+                            user_index=user_index,
+                            user_count=len(config.users),
+                            workflow_state=WorkflowState(),
+                        )
+                        for run_step in steps:
+                            current_step = run_step.__module__.rsplit(
+                                ".", maxsplit=1
+                            )[-1]
+                            execution_context.workflow_state.current_step = (
+                                current_step
+                            )
+                            current_process = "ステップ開始"
+                            execution_context.workflow_state.current_process = (
+                                current_process
+                            )
+                            run_step(execution_context)
+                            current_process = (
+                                execution_context.workflow_state.current_process
+                            )
+                    except Exception as error:
+                        if execution_context is not None:
+                            current_process = (
+                                execution_context.workflow_state.current_process
+                            )
+                        logger.error(
+                            "ステップエラー | 利用者番号: %s | "
+                            "申込回: 該当なし | ステップ: %s | "
+                            "ステップ内の処理: %s | 理由: %s: %s",
+                            user.user_number,
+                            current_step,
+                            current_process,
+                            type(error).__name__,
+                            error,
+                        )
+                        if attempt > MAX_CHECK_RETRIES:
+                            outcomes[user_index] = "未確認（再試行上限）"
+                            logger.error(
+                                "利用者 %d/%d の結果確認は%d回の再試行後も"
+                                "失敗しました（%s）。次の利用者へ進みます。",
+                                user_index,
+                                len(config.users),
+                                MAX_CHECK_RETRIES,
+                                error,
+                            )
+                            break
+                        logger.warning(
+                            "Workflow failed for account %d/%d: %s Restarting "
+                            "from step1 after %d seconds (retry %d/%d).",
+                            user_index,
+                            len(config.users),
+                            error,
+                            CHECK_RETRY_DELAY_SECONDS,
+                            attempt,
+                            MAX_CHECK_RETRIES,
+                        )
+                        time.sleep(CHECK_RETRY_DELAY_SECONDS)
+                    else:
+                        break
+                    finally:
+                        if browser_context is not None:
+                            try:
+                                browser_context.close()
+                            except Exception as error:
+                                logger.warning(
+                                    "ブラウザーセッションを閉じられませんでした | "
+                                    "利用者番号: %s | 理由: %s: %s",
+                                    user.user_number,
+                                    type(error).__name__,
+                                    error,
+                                )
+    finally:
+        _log_check_summary(logger, config, outcomes)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="endoIsFree workflow runner")
+    parser.add_argument("mode", choices=("free", "check"))
+    args = parser.parse_args()
+    if args.mode == "free":
+        run_free()
+    else:
+        run_check()
 
 
 if __name__ == "__main__":

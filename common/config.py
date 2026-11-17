@@ -31,7 +31,7 @@ def load_config(config_path: Path) -> ApplicationConfig:
     except FileNotFoundError as error:
         raise FileNotFoundError(
             f"Configuration file not found: {config_path}. "
-            "Create it with endoCustom/customizer.html."
+            "Create it with endoCustom/freeCustomizer.html."
         ) from error
     except json.JSONDecodeError as error:
         raise ValueError(
@@ -39,39 +39,9 @@ def load_config(config_path: Path) -> ApplicationConfig:
             f"(line {error.lineno}, column {error.colno})."
         ) from error
 
-    if not isinstance(config, dict) or not isinstance(config.get("users"), list):
+    if not isinstance(config, dict):
         raise ValueError("Configuration must contain a users list.")
-    if not config["users"]:
-        raise ValueError("Configuration must contain at least one user.")
-
-    accounts: list[UserAccount] = []
-    seen_user_numbers: set[str] = set()
-    for index, record in enumerate(config["users"], start=1):
-        if not isinstance(record, dict):
-            raise ValueError(f"User record {index} must be an object.")
-
-        user_number = record.get("user_number")
-        password = record.get("password")
-        if not isinstance(user_number, str) or not user_number.strip():
-            raise ValueError(f"User record {index} has an empty or invalid user number.")
-        if not isinstance(password, str) or not password:
-            raise ValueError(f"User record {index} has an empty or invalid password.")
-        if len(user_number.strip()) > 8:
-            raise ValueError(f"User record {index} user number exceeds 8 characters.")
-        if len(password) > 24:
-            raise ValueError(f"User record {index} password exceeds 24 characters.")
-
-        normalized_user_number = user_number.strip()
-        if normalized_user_number in seen_user_numbers:
-            raise ValueError(f"User record {index} duplicates an earlier user number.")
-
-        seen_user_numbers.add(normalized_user_number)
-        accounts.append(
-            UserAccount(
-                user_number=normalized_user_number,
-                password=password,
-            )
-        )
+    accounts = load_user_accounts(config.get("users"))
 
     park = config.get("park")
     facility = config.get("facility")
@@ -125,7 +95,7 @@ def load_config(config_path: Path) -> ApplicationConfig:
         raise ValueError("Configuration show_browser must be true or false.")
 
     return ApplicationConfig(
-        users=tuple(accounts),
+        users=accounts,
         park=park.strip(),
         facility=facility.strip(),
         month=month,
@@ -134,3 +104,40 @@ def load_config(config_path: Path) -> ApplicationConfig:
         start_times=tuple(raw_start_times),
         show_browser=show_browser,
     )
+
+
+def load_user_accounts(raw_users: object) -> tuple[UserAccount, ...]:
+    if not isinstance(raw_users, list):
+        raise ValueError("Configuration must contain a users list.")
+    if not raw_users:
+        raise ValueError("Configuration must contain at least one user.")
+
+    accounts: list[UserAccount] = []
+    seen_user_numbers: set[str] = set()
+    for index, record in enumerate(raw_users, start=1):
+        if not isinstance(record, dict):
+            raise ValueError(f"User record {index} must be an object.")
+
+        user_number = record.get("user_number")
+        password = record.get("password")
+        if not isinstance(user_number, str) or not user_number.strip():
+            raise ValueError(f"User record {index} has an empty or invalid user number.")
+        if not isinstance(password, str) or not password:
+            raise ValueError(f"User record {index} has an empty or invalid password.")
+        if len(user_number.strip()) > 8:
+            raise ValueError(f"User record {index} user number exceeds 8 characters.")
+        if len(password) > 24:
+            raise ValueError(f"User record {index} password exceeds 24 characters.")
+
+        normalized_user_number = user_number.strip()
+        if normalized_user_number in seen_user_numbers:
+            raise ValueError(f"User record {index} duplicates an earlier user number.")
+
+        seen_user_numbers.add(normalized_user_number)
+        accounts.append(
+            UserAccount(
+                user_number=normalized_user_number,
+                password=password,
+            )
+        )
+    return tuple(accounts)
