@@ -1,12 +1,16 @@
 import logging
 from pathlib import Path
+from typing import Literal
 
 
-def configure_logging(project_root: Path) -> logging.Logger:
+def configure_logging(
+    project_root: Path,
+    workflow: Literal["free", "check"],
+) -> logging.Logger:
     logs_dir = project_root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
-    logger = logging.getLogger("endoIsFree")
+    logger = logging.getLogger(f"endoIsFree.{workflow}")
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
     logger.propagate = False
@@ -14,7 +18,10 @@ def configure_logging(project_root: Path) -> logging.Logger:
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
-    file_handler = logging.FileHandler(logs_dir / "endoIsFree.log", encoding="utf-8")
+    file_handler = logging.FileHandler(
+        logs_dir / f"{workflow}Endo.log",
+        encoding="utf-8",
+    )
     file_handler.setFormatter(formatter)
 
     logger.addHandler(console_handler)
