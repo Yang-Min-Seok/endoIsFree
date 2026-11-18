@@ -2,7 +2,7 @@ import re
 from typing import Optional
 
 from common.browser import SITE_ACTION_TIMEOUT_MS
-from common.context import CheckExecutionContext, LosingApplicationRecord
+from common.context import CheckExecutionContext, LotteryResultRecord
 
 RESULT_TABLE_SELECTOR = "table.table.sp-block-table"
 EXPECTED_HEADERS = (
@@ -14,12 +14,9 @@ EXPECTED_HEADERS = (
     "利用料金",
 )
 CELL_LABELS = (
-    None,
-    "予約番号：",
     "公園・施設：",
     "利用日：",
     "利用時間：",
-    None,
 )
 
 
@@ -67,7 +64,7 @@ def _cell_value(cell_text: str, label: Optional[str]) -> str:
 
 def _read_losing_applications(
     context: CheckExecutionContext,
-) -> list[LosingApplicationRecord]:
+) -> list[LotteryResultRecord]:
     context.page.wait_for_function(
         """({selector, expectedHeaders, expectedCellLabels}) => {
             return Array.from(document.querySelectorAll(selector)).some(table => {
@@ -107,7 +104,7 @@ def _read_losing_applications(
     if rows.count() == 0:
         raise RuntimeError("The losing-application result table has no rows.")
 
-    records: list[LosingApplicationRecord] = []
+    records: list[LotteryResultRecord] = []
     for row_index in range(rows.count()):
         cells = rows.nth(row_index).locator("td")
         if cells.count() != len(EXPECTED_HEADERS):
@@ -116,28 +113,27 @@ def _read_losing_applications(
                 f"{cells.count()} cells; expected {len(EXPECTED_HEADERS)}."
             )
         cell_values = []
-        for index, label in enumerate(CELL_LABELS):
+        for index, label in enumerate(CELL_LABELS, start=2):
             cell_text = cells.nth(index).text_content()
             if cell_text is None:
                 raise RuntimeError(
                     f"Losing-application cell {index + 1} has no text."
                 )
             cell_values.append(_cell_value(cell_text, label))
-        values = tuple(cell_values)
-        if values[0] != "落選":
+        fee = cells.nth(5).text_content()
+        if fee is None or not _normalize_text(fee):
             raise RuntimeError(
-                f"Losing-application row {row_index + 1} has an unexpected "
-                f"status: {values[0]!r}."
+                f"Losing-application fee cell in row {row_index + 1} "
+                "is empty."
             )
         records.append(
-            LosingApplicationRecord(
+            LotteryResultRecord(
                 user_number=context.user.user_number,
-                status=values[0],
-                reservation_number=values[1],
-                park_facility=values[2],
-                use_date=values[3],
-                use_time=values[4],
-                fee=values[5],
+                result_type="落選",
+                park_facility=cell_values[0],
+                use_date=cell_values[1],
+                use_time=cell_values[2],
+                fee=_normalize_text(fee),
             )
         )
     return records
@@ -151,7 +147,7 @@ def run(context: CheckExecutionContext) -> None:
         context.user_count,
     )
     records = _read_losing_applications(context)
-    context.check_state.losing_applications = records
+    context.check_state.lottery_results.extend(records)
     context.workflow_state.current_process = "落選した申込み情報を記録"
     context.logger.info(
         "Collected %d losing-application result(s) for account %d/%d.",
@@ -161,11 +157,9 @@ def run(context: CheckExecutionContext) -> None:
     )
     for record in records:
         context.logger.info(
-            "落選申込み情報 | 利用者番号: %s | 状態: %s | 予約番号: %s | "
-            "公園・施設: %s | 利用日: %s | 利用時間: %s | 利用料金: %s",
+            "落選申込み情報 | 利用者番号: %s | 公園・施設: %s | "
+            "利用日: %s | 利用時間: %s | 利用料金: %s",
             record.user_number,
-            record.status,
-            record.reservation_number,
             record.park_facility,
             record.use_date,
             record.use_time,

@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from playwright.sync_api import Page
 
@@ -25,16 +25,15 @@ class WorkflowState:
 class CheckWorkflowState:
     has_unconfirmed_winning_results: Optional[bool] = None
     account_workflow_complete: bool = False
-    losing_applications: list["LosingApplicationRecord"] = field(
+    lottery_results: list["LotteryResultRecord"] = field(
         default_factory=list
     )
 
 
 @dataclass(frozen=True)
-class LosingApplicationRecord:
+class LotteryResultRecord:
     user_number: str
-    status: str
-    reservation_number: str
+    result_type: Literal["当選", "落選"]
     park_facility: str
     use_date: str
     use_time: str

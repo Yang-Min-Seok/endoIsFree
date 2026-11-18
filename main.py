@@ -13,7 +13,7 @@ from common.context import (
     CheckWorkflowState,
     CommonExecutionContext,
     ExecutionContext,
-    LosingApplicationRecord,
+    LotteryResultRecord,
     WorkflowState,
 )
 from common.logging_config import configure_logging
@@ -24,8 +24,6 @@ from checkSteps import step3 as check_step3
 from checkSteps import step4 as check_step4
 from checkSteps import step5 as check_step5
 from checkSteps import step6 as check_step6
-from checkSteps import step7 as check_step7
-from checkSteps import step8 as check_step8
 from freeSteps import (
     step0,
     step3,
@@ -299,7 +297,7 @@ def _log_check_summary(
     logger: logging.Logger,
     config: CheckConfig,
     outcomes: dict[int, str],
-    losing_applications: list[LosingApplicationRecord],
+    lottery_results: list[LotteryResultRecord],
 ) -> None:
     logger.info("========== 最終実行結果 ==========")
     logger.info("| 利用者番号 | 結果 |")
@@ -307,19 +305,25 @@ def _log_check_summary(
     for user_index, user in enumerate(config.users, start=1):
         logger.info("| %s | %s |", user.user_number, outcomes[user_index])
     logger.info("====================================")
-    if losing_applications:
-        logger.info("========== 落選した申込み ==========")
+    for result_type, title in (
+        ("当選", "当選申込み"),
+        ("落選", "落選申込み"),
+    ):
+        results = [
+            result for result in lottery_results
+            if result.result_type == result_type
+        ]
+        if not results:
+            continue
+        logger.info("========== %s ==========", title)
         logger.info(
-            "| 利用者番号 | 状態 | 予約番号 | 公園・施設 | "
-            "利用日 | 利用時間 | 利用料金 |"
+            "| 利用者番号 | 公園・施設 | 利用日 | 利用時間 | 利用料金 |"
         )
-        logger.info("| --- | --- | --- | --- | --- | --- | --- |")
-        for result in losing_applications:
+        logger.info("| --- | --- | --- | --- | --- |")
+        for result in results:
             logger.info(
-                "| %s | %s | %s | %s | %s | %s | %s |",
+                "| %s | %s | %s | %s | %s |",
                 result.user_number,
-                result.status,
-                result.reservation_number,
                 result.park_facility,
                 result.use_date,
                 result.use_time,
@@ -339,14 +343,12 @@ def run_check() -> None:
         check_step4.run,
         check_step5.run,
         check_step6.run,
-        check_step7.run,
-        check_step8.run,
     )
     outcomes = {
         user_index: "未確認（結果確認ステップ未実装）"
         for user_index in range(1, len(config.users) + 1)
     }
-    losing_applications: list[LosingApplicationRecord] = []
+    lottery_results: list[LotteryResultRecord] = []
 
     try:
         logger.info("Launching browser in visible mode.")
@@ -425,8 +427,8 @@ def run_check() -> None:
                             )
                         else:
                             outcomes[user_index] = "当選結果なし"
-                        losing_applications.extend(
-                            execution_context.check_state.losing_applications
+                        lottery_results.extend(
+                            execution_context.check_state.lottery_results
                         )
                     except Exception as error:
                         if execution_context is not None:
@@ -484,7 +486,7 @@ def run_check() -> None:
             logger,
             config,
             outcomes,
-            losing_applications,
+            lottery_results,
         )
 
 
