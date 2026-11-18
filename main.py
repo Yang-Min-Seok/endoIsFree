@@ -360,7 +360,6 @@ def run_check() -> None:
                 confirmed_winning_passes = 0
                 account_has_winning_results = False
                 account_winning_results_recorded = False
-                confirmation_retry_required = False
                 while winning_pass < expected_winning_passes:
                     pass_succeeded = False
                     for attempt in range(1, MAX_CHECK_RETRIES + 2):
@@ -399,17 +398,6 @@ def run_check() -> None:
                                 execution_context.workflow_state.current_step = (
                                     current_step
                                 )
-                                if (
-                                    confirmation_retry_required
-                                    and run_step is check_step5.run
-                                    and not execution_context.check_state
-                                    .has_unconfirmed_winning_results
-                                ):
-                                    raise RuntimeError(
-                                        "The previous winning confirmation "
-                                        "was not verified and no unconfirmed "
-                                        "winning result remains."
-                                    )
                                 if (
                                     winning_pass > 0
                                     and run_step is check_step5.run
@@ -518,12 +506,6 @@ def run_check() -> None:
                                             .lottery_results
                                         )
                                         account_winning_results_recorded = True
-                                if (
-                                    execution_context.check_state
-                                    .winning_application_confirmation_attempted
-                                    and current_step == "step6"
-                                ):
-                                    confirmation_retry_required = True
                             logger.error(
                                 "ステップエラー | 利用者番号: %s | "
                                 "申込回: 該当なし | ステップ: %s | "
@@ -538,15 +520,14 @@ def run_check() -> None:
                                 execution_context is not None
                                 and execution_context.check_state
                                 .winning_application_confirmation_attempted
-                                and current_step != "step6"
                             ):
                                 outcomes[user_index] = (
                                     "当選結果あり（結果要確認）"
                                 )
                                 logger.error(
                                     "当選申込みの確認操作を開始した後に"
-                                    "エラーが発生したため、重複処理を避けて"
-                                    "自動再試行を停止します。状態を確認して"
+                                    "エラーが発生したため、結果の重複操作を"
+                                    "避けて自動再試行を停止します。状態を確認して"
                                     "ください | 利用者番号: %s",
                                     user.user_number,
                                 )
@@ -611,7 +592,6 @@ def run_check() -> None:
                         .winning_confirmation_completed
                     ):
                         confirmed_winning_passes += 1
-                        confirmation_retry_required = False
                     if (
                         execution_context is not None
                         and execution_context.check_state
