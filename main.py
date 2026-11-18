@@ -358,6 +358,20 @@ def run_check() -> None:
                             execution_context.workflow_state.current_step = (
                                 current_step
                             )
+                            current_process = "ステップ開始前の待機"
+                            execution_context.workflow_state.current_process = (
+                                current_process
+                            )
+                            logger.info(
+                                "Waiting %d seconds before %s.",
+                                STEP_START_DELAY_SECONDS,
+                                current_step,
+                            )
+                            time.sleep(STEP_START_DELAY_SECONDS)
+                            logger.info(
+                                "Wait complete. Starting %s.",
+                                current_step,
+                            )
                             current_process = "ステップ開始"
                             execution_context.workflow_state.current_process = (
                                 current_process
