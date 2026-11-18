@@ -194,16 +194,27 @@ def run(context: CheckExecutionContext) -> None:
             context.user_index,
             context.user_count,
         )
-        for result in winning_results:
+        context.logger.info(
+            "当選結果件数 | 利用者番号: %s | 件数: %d件",
+            context.user.user_number,
+            len(winning_results),
+        )
+        if not context.check_state.is_followup_winner_check:
+            context.logger.info("========== 当選結果情報 ==========")
             context.logger.info(
-                "当選結果情報 | 利用者番号: %s | 公園・施設: %s | "
-                "利用日: %s | 利用時間: %s | 利用料金: %s",
-                result.user_number,
-                result.park_facility,
-                result.use_date,
-                result.use_time,
-                result.fee,
+                "| 利用者番号 | 公園・施設 | 利用日 | 利用時間 | 利用料金 |"
             )
+            context.logger.info("| --- | --- | --- | --- | --- |")
+            for result in winning_results:
+                context.logger.info(
+                    "| %s | %s | %s | %s | %s |",
+                    result.user_number,
+                    result.park_facility,
+                    result.use_date,
+                    result.use_time,
+                    result.fee,
+                )
+            context.logger.info("====================================")
         context.logger.info(
             "Unconfirmed winning results were found for account %d/%d. "
             "There may be up to two winning results.",
@@ -261,6 +272,14 @@ def run(context: CheckExecutionContext) -> None:
             "(HTTP %s).",
             context.page.url,
             response.status if response is not None else "no response",
+        )
+        return
+
+    if context.check_state.is_followup_winner_check:
+        context.logger.info(
+            "No remaining winning results were found for account %d/%d.",
+            context.user_index,
+            context.user_count,
         )
         return
 

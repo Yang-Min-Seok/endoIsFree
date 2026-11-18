@@ -37,6 +37,7 @@ from freeSteps import (
 MAX_WORKFLOW_RETRIES = 3
 WORKFLOW_RETRY_DELAY_SECONDS = 5
 STEP_START_DELAY_SECONDS = 10
+WINNER_CONFIRMATION_STEP_DELAY_SECONDS = STEP_START_DELAY_SECONDS
 MAX_CHECK_RETRIES = 3
 CHECK_RETRY_DELAY_SECONDS = 5
 APPLICATION_ROUND_COUNT = 2
@@ -354,133 +355,275 @@ def run_check() -> None:
         logger.info("Launching browser in visible mode.")
         with open_browser(headless=False) as browser:
             for user_index, user in enumerate(config.users, start=1):
-                for attempt in range(1, MAX_CHECK_RETRIES + 2):
-                    logger.info(
-                        "Starting workflow for account %d/%d (attempt %d/%d).",
-                        user_index,
-                        len(config.users),
-                        attempt,
-                        MAX_CHECK_RETRIES + 1,
-                    )
-                    browser_context = None
-                    execution_context = None
-                    current_step = "step1"
-                    current_process = "ブラウザーセッションを開始"
-                    try:
-                        browser_context = browser.new_context()
-                        execution_context = CheckExecutionContext(
-                            project_root=project_root,
-                            logger=logger,
-                            page=browser_context.new_page(),
-                            user=user,
-                            user_index=user_index,
-                            user_count=len(config.users),
-                            workflow_state=WorkflowState(),
-                            check_state=CheckWorkflowState(),
-                        )
-                        for run_step in steps:
-                            current_step = run_step.__module__.rsplit(
-                                ".", maxsplit=1
-                            )[-1]
-                            execution_context.workflow_state.current_step = (
-                                current_step
-                            )
-                            current_process = "ステップ開始前の待機"
-                            execution_context.workflow_state.current_process = (
-                                current_process
-                            )
-                            logger.info(
-                                "Waiting %d seconds before %s.",
-                                STEP_START_DELAY_SECONDS,
-                                current_step,
-                            )
-                            time.sleep(STEP_START_DELAY_SECONDS)
-                            logger.info(
-                                "Wait complete. Starting %s.",
-                                current_step,
-                            )
-                            current_process = "ステップ開始"
-                            execution_context.workflow_state.current_process = (
-                                current_process
-                            )
-                            run_step(execution_context)
-                            current_process = (
-                                execution_context.workflow_state.current_process
-                            )
-                            if (
-                                execution_context.check_state
-                                .account_workflow_complete
-                            ):
-                                logger.info(
-                                    "The no-win workflow is complete for "
-                                    "account %d/%d. Moving to the next account.",
-                                    user_index,
-                                    len(config.users),
-                                )
-                                break
-                        if (
-                            execution_context.check_state
-                            .has_unconfirmed_winning_results
-                        ):
-                            outcomes[user_index] = (
-                                "当選結果あり（確認未完了）"
-                            )
-                        else:
-                            outcomes[user_index] = "当選結果なし"
-                        lottery_results.extend(
-                            execution_context.check_state.lottery_results
-                        )
-                    except Exception as error:
-                        if execution_context is not None:
-                            current_process = (
-                                execution_context.workflow_state.current_process
-                            )
-                        logger.error(
-                            "ステップエラー | 利用者番号: %s | "
-                            "申込回: 該当なし | ステップ: %s | "
-                            "ステップ内の処理: %s | 理由: %s: %s",
-                            user.user_number,
-                            current_step,
-                            current_process,
-                            type(error).__name__,
-                            error,
-                        )
-                        if attempt > MAX_CHECK_RETRIES:
-                            outcomes[user_index] = "未確認（再試行上限）"
-                            logger.error(
-                                "利用者 %d/%d の結果確認は%d回の再試行後も"
-                                "失敗しました（%s）。次の利用者へ進みます。",
-                                user_index,
-                                len(config.users),
-                                MAX_CHECK_RETRIES,
-                                error,
-                            )
-                            break
-                        logger.warning(
-                            "Workflow failed for account %d/%d: %s Restarting "
-                            "from step1 after %d seconds (retry %d/%d).",
+                winning_pass = 0
+                expected_winning_passes = 1
+                confirmed_winning_passes = 0
+                account_has_winning_results = False
+                account_winning_results_recorded = False
+                confirmation_retry_required = False
+                while winning_pass < expected_winning_passes:
+                    pass_succeeded = False
+                    for attempt in range(1, MAX_CHECK_RETRIES + 2):
+                        logger.info(
+                            "Starting workflow for account %d/%d "
+                            "(winning-result pass %d/%d, attempt %d/%d).",
                             user_index,
                             len(config.users),
-                            error,
-                            CHECK_RETRY_DELAY_SECONDS,
+                            winning_pass + 1,
+                            expected_winning_passes,
                             attempt,
-                            MAX_CHECK_RETRIES,
+                            MAX_CHECK_RETRIES + 1,
                         )
-                        time.sleep(CHECK_RETRY_DELAY_SECONDS)
-                    else:
-                        break
-                    finally:
-                        if browser_context is not None:
-                            try:
-                                browser_context.close()
-                            except Exception as error:
-                                logger.warning(
-                                    "ブラウザーセッションを閉じられませんでした | "
-                                    "利用者番号: %s | 理由: %s: %s",
+                        browser_context = None
+                        execution_context = None
+                        current_step = "step1"
+                        current_process = "ブラウザーセッションを開始"
+                        try:
+                            browser_context = browser.new_context()
+                            execution_context = CheckExecutionContext(
+                                project_root=project_root,
+                                logger=logger,
+                                page=browser_context.new_page(),
+                                user=user,
+                                user_index=user_index,
+                                user_count=len(config.users),
+                                workflow_state=WorkflowState(),
+                                check_state=CheckWorkflowState(
+                                    is_followup_winner_check=winning_pass > 0
+                                ),
+                            )
+                            for run_step in steps:
+                                current_step = run_step.__module__.rsplit(
+                                    ".", maxsplit=1
+                                )[-1]
+                                execution_context.workflow_state.current_step = (
+                                    current_step
+                                )
+                                if (
+                                    confirmation_retry_required
+                                    and run_step is check_step5.run
+                                    and not execution_context.check_state
+                                    .has_unconfirmed_winning_results
+                                ):
+                                    raise RuntimeError(
+                                        "The previous winning confirmation "
+                                        "was not verified and no unconfirmed "
+                                        "winning result remains."
+                                    )
+                                if (
+                                    winning_pass > 0
+                                    and run_step is check_step5.run
+                                    and not execution_context.check_state
+                                    .has_unconfirmed_winning_results
+                                ):
+                                    current_process = (
+                                        "残りの当選結果を確認"
+                                    )
+                                    logger.info(
+                                        "No unconfirmed winning results remain "
+                                        "for account %d/%d. Finishing the "
+                                        "follow-up check.",
+                                        user_index,
+                                        len(config.users),
+                                    )
+                                    break
+
+                                current_process = "ステップ開始前の待機"
+                                execution_context.workflow_state.current_process = (
+                                    current_process
+                                )
+                                step_start_delay_seconds = (
+                                    STEP_START_DELAY_SECONDS
+                                )
+                                if (
+                                    current_step == "step6"
+                                    and execution_context.check_state
+                                    .winning_application_confirmation_accepted
+                                ):
+                                    step_start_delay_seconds = (
+                                        WINNER_CONFIRMATION_STEP_DELAY_SECONDS
+                                    )
+                                logger.info(
+                                    "Waiting %d seconds before %s.",
+                                    step_start_delay_seconds,
+                                    current_step,
+                                )
+                                time.sleep(step_start_delay_seconds)
+                                logger.info(
+                                    "Wait complete. Starting %s.",
+                                    current_step,
+                                )
+                                current_process = "ステップ開始"
+                                execution_context.workflow_state.current_process = (
+                                    current_process
+                                )
+                                run_step(execution_context)
+                                current_process = (
+                                    execution_context.workflow_state.current_process
+                                )
+                                if (
+                                    execution_context.check_state
+                                    .account_workflow_complete
+                                ):
+                                    logger.info(
+                                        "The current processing pass is "
+                                        "complete for account %d/%d.",
+                                        user_index,
+                                        len(config.users),
+                                    )
+                                    break
+
+                            check_state = execution_context.check_state
+                            if winning_pass == 0:
+                                if check_state.has_unconfirmed_winning_results:
+                                    account_has_winning_results = True
+                                    outcomes[user_index] = (
+                                        "当選結果あり（確認未完了）"
+                                    )
+                                    detected_winners = sum(
+                                        result.result_type == "当選"
+                                        for result in check_state.lottery_results
+                                    )
+                                    expected_winning_passes = max(
+                                        1,
+                                        detected_winners,
+                                    )
+                                    if not account_winning_results_recorded:
+                                        lottery_results.extend(
+                                            check_state.lottery_results
+                                        )
+                                        account_winning_results_recorded = True
+                                else:
+                                    if not account_has_winning_results:
+                                        outcomes[user_index] = "当選結果なし"
+                                        lottery_results.extend(
+                                            check_state.lottery_results
+                                        )
+                        except Exception as error:
+                            if execution_context is not None:
+                                current_process = (
+                                    execution_context.workflow_state.current_process
+                                )
+                                if (
+                                    execution_context.check_state
+                                    .has_unconfirmed_winning_results
+                                ):
+                                    account_has_winning_results = True
+                                    if (
+                                        winning_pass == 0
+                                        and not account_winning_results_recorded
+                                    ):
+                                        lottery_results.extend(
+                                            execution_context.check_state
+                                            .lottery_results
+                                        )
+                                        account_winning_results_recorded = True
+                                if (
+                                    execution_context.check_state
+                                    .winning_application_confirmation_attempted
+                                    and current_step == "step6"
+                                ):
+                                    confirmation_retry_required = True
+                            logger.error(
+                                "ステップエラー | 利用者番号: %s | "
+                                "申込回: 該当なし | ステップ: %s | "
+                                "ステップ内の処理: %s | 理由: %s: %s",
+                                user.user_number,
+                                current_step,
+                                current_process,
+                                type(error).__name__,
+                                error,
+                            )
+                            if (
+                                execution_context is not None
+                                and execution_context.check_state
+                                .winning_application_confirmation_attempted
+                                and current_step != "step6"
+                            ):
+                                outcomes[user_index] = (
+                                    "当選結果あり（結果要確認）"
+                                )
+                                logger.error(
+                                    "当選申込みの確認操作を開始した後に"
+                                    "エラーが発生したため、重複処理を避けて"
+                                    "自動再試行を停止します。状態を確認して"
+                                    "ください | 利用者番号: %s",
                                     user.user_number,
-                                    type(error).__name__,
+                                )
+                                break
+                            if attempt > MAX_CHECK_RETRIES:
+                                outcomes[user_index] = (
+                                    "当選結果あり（再試行上限）"
+                                    if (
+                                        winning_pass > 0
+                                        or account_has_winning_results
+                                        or (
+                                            execution_context is not None
+                                            and execution_context.check_state
+                                            .has_unconfirmed_winning_results
+                                        )
+                                    )
+                                    else "未確認（再試行上限）"
+                                )
+                                logger.error(
+                                    "利用者 %d/%d の結果確認は%d回の再試行後も"
+                                    "失敗しました（%s）。次の利用者へ進みます。",
+                                    user_index,
+                                    len(config.users),
+                                    MAX_CHECK_RETRIES,
                                     error,
                                 )
+                                break
+                            logger.warning(
+                                "Workflow failed for account %d/%d: %s "
+                                "Restarting from step1 after %d seconds "
+                                "(retry %d/%d).",
+                                user_index,
+                                len(config.users),
+                                error,
+                                CHECK_RETRY_DELAY_SECONDS,
+                                attempt,
+                                MAX_CHECK_RETRIES,
+                            )
+                            time.sleep(CHECK_RETRY_DELAY_SECONDS)
+                        else:
+                            pass_succeeded = True
+                        finally:
+                            if browser_context is not None:
+                                try:
+                                    browser_context.close()
+                                except Exception as error:
+                                    logger.warning(
+                                        "ブラウザーセッションを閉じられませんでした | "
+                                        "利用者番号: %s | 理由: %s: %s",
+                                        user.user_number,
+                                        type(error).__name__,
+                                        error,
+                                    )
+                        if pass_succeeded:
+                            break
+
+                    if not pass_succeeded:
+                        break
+                    if (
+                        execution_context is not None
+                        and execution_context.check_state
+                        .winning_confirmation_completed
+                    ):
+                        confirmed_winning_passes += 1
+                        confirmation_retry_required = False
+                    if (
+                        execution_context is not None
+                        and execution_context.check_state
+                        .has_unconfirmed_winning_results
+                    ):
+                        account_has_winning_results = True
+                    winning_pass += 1
+                if (
+                    account_has_winning_results
+                    and confirmed_winning_passes == expected_winning_passes
+                ):
+                    outcomes[user_index] = "当選結果確認完了"
     finally:
         _log_check_summary(
             logger,

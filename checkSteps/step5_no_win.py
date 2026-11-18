@@ -155,13 +155,18 @@ def run(context: CheckExecutionContext) -> None:
         context.user_index,
         context.user_count,
     )
+    context.logger.info("========== 落選申込み情報 ==========")
+    context.logger.info(
+        "| 利用者番号 | 公園・施設 | 利用日 | 利用時間 | 利用料金 |"
+    )
+    context.logger.info("| --- | --- | --- | --- | --- |")
     for record in records:
         context.logger.info(
-            "落選申込み情報 | 利用者番号: %s | 公園・施設: %s | "
-            "利用日: %s | 利用時間: %s | 利用料金: %s",
+            "| %s | %s | %s | %s | %s |",
             record.user_number,
             record.park_facility,
             record.use_date,
             record.use_time,
             record.fee,
         )
+    context.logger.info("====================================")

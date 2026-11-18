@@ -73,33 +73,41 @@ def run(context: CheckExecutionContext) -> None:
     def dialog_handler(dialog: Dialog) -> None:
         dialog_messages.append(dialog.message)
         context.logger.info(
-            "A %s confirmation dialog is open for manual handling: %s. "
-            "Automation will not accept or dismiss it.",
+            "Accepting the %s confirmation dialog for the winning "
+            "application: %s.",
             dialog.type,
             dialog.message,
         )
+        dialog.accept()
+        context.check_state.winning_application_confirmation_accepted = True
 
     context.workflow_state.current_process = (
-        "当選申込みを確認して手動ダイアログ処理を待つ"
+        "当選申込み確認ダイアログのOKを押す"
     )
     context.page.on("dialog", dialog_handler)
     try:
+        context.check_state.winning_application_confirmation_attempted = True
         confirm_button.click(timeout=0)
     finally:
         context.page.remove_listener("dialog", dialog_handler)
 
     if dialog_messages:
-        context.workflow_state.current_process = "手動確認ダイアログ処理後"
+        context.workflow_state.current_process = "当選申込み確認ダイアログを承認"
         context.logger.info(
-            "The confirmation dialog was handled manually for account %d/%d.",
+            "Accepted the winning application confirmation dialog for "
+            "account %d/%d.",
             context.user_index,
             context.user_count,
         )
     else:
         context.workflow_state.current_process = "確認ダイアログ未検出"
-        context.logger.warning(
+        context.logger.error(
             "The expected confirmation dialog did not appear after clicking "
-            "the winning application button for account %d/%d.",
+            "the winning application button for account %d/%d. "
+            "The submission result is unknown.",
             context.user_index,
             context.user_count,
+        )
+        raise RuntimeError(
+            "The winning application confirmation dialog did not appear."
         )
