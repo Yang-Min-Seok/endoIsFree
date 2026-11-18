@@ -9,8 +9,11 @@ from common.check_config import CheckConfig, load_check_config
 from common.config import ApplicationConfig, load_config
 from common.context import (
     ApplicationCompletionNotConfirmed,
+    CheckExecutionContext,
+    CheckWorkflowState,
     CommonExecutionContext,
     ExecutionContext,
+    LosingApplicationRecord,
     WorkflowState,
 )
 from common.logging_config import configure_logging
@@ -296,6 +299,7 @@ def _log_check_summary(
     logger: logging.Logger,
     config: CheckConfig,
     outcomes: dict[int, str],
+    losing_applications: list[LosingApplicationRecord],
 ) -> None:
     logger.info("========== 最終実行結果 ==========")
     logger.info("| 利用者番号 | 結果 |")
@@ -303,6 +307,25 @@ def _log_check_summary(
     for user_index, user in enumerate(config.users, start=1):
         logger.info("| %s | %s |", user.user_number, outcomes[user_index])
     logger.info("====================================")
+    if losing_applications:
+        logger.info("========== 落選した申込み ==========")
+        logger.info(
+            "| 利用者番号 | 状態 | 予約番号 | 公園・施設 | "
+            "利用日 | 利用時間 | 利用料金 |"
+        )
+        logger.info("| --- | --- | --- | --- | --- | --- | --- |")
+        for result in losing_applications:
+            logger.info(
+                "| %s | %s | %s | %s | %s | %s | %s |",
+                result.user_number,
+                result.status,
+                result.reservation_number,
+                result.park_facility,
+                result.use_date,
+                result.use_time,
+                result.fee,
+            )
+        logger.info("====================================")
 
 
 def run_check() -> None:
@@ -323,6 +346,7 @@ def run_check() -> None:
         user_index: "未確認（結果確認ステップ未実装）"
         for user_index in range(1, len(config.users) + 1)
     }
+    losing_applications: list[LosingApplicationRecord] = []
 
     try:
         logger.info("Launching browser in visible mode.")
@@ -342,7 +366,7 @@ def run_check() -> None:
                     current_process = "ブラウザーセッションを開始"
                     try:
                         browser_context = browser.new_context()
-                        execution_context = CommonExecutionContext(
+                        execution_context = CheckExecutionContext(
                             project_root=project_root,
                             logger=logger,
                             page=browser_context.new_page(),
@@ -350,6 +374,7 @@ def run_check() -> None:
                             user_index=user_index,
                             user_count=len(config.users),
                             workflow_state=WorkflowState(),
+                            check_state=CheckWorkflowState(),
                         )
                         for run_step in steps:
                             current_step = run_step.__module__.rsplit(
@@ -380,6 +405,29 @@ def run_check() -> None:
                             current_process = (
                                 execution_context.workflow_state.current_process
                             )
+                            if (
+                                execution_context.check_state
+                                .account_workflow_complete
+                            ):
+                                logger.info(
+                                    "The no-win workflow is complete for "
+                                    "account %d/%d. Moving to the next account.",
+                                    user_index,
+                                    len(config.users),
+                                )
+                                break
+                        if (
+                            execution_context.check_state
+                            .has_unconfirmed_winning_results
+                        ):
+                            outcomes[user_index] = (
+                                "当選結果あり（確認未完了）"
+                            )
+                        else:
+                            outcomes[user_index] = "当選結果なし"
+                        losing_applications.extend(
+                            execution_context.check_state.losing_applications
+                        )
                     except Exception as error:
                         if execution_context is not None:
                             current_process = (
@@ -432,7 +480,12 @@ def run_check() -> None:
                                     error,
                                 )
     finally:
-        _log_check_summary(logger, config, outcomes)
+        _log_check_summary(
+            logger,
+            config,
+            outcomes,
+            losing_applications,
+        )
 
 
 def main() -> None:
