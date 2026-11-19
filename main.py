@@ -18,6 +18,7 @@ from common.context import (
 )
 from common.logging_config import configure_logging
 from playwright.sync_api import Page
+from commonSteps import step0 as common_step0
 from commonSteps import step1 as common_step1
 from commonSteps import step2 as common_step2
 from checkSteps import step3 as check_step3
@@ -25,7 +26,6 @@ from checkSteps import step4 as check_step4
 from checkSteps import step5 as check_step5
 from checkSteps import step6 as check_step6
 from freeSteps import (
-    step0,
     step3,
     step4,
     step5,
@@ -151,7 +151,7 @@ def run_free() -> None:
     project_root = Path(__file__).resolve().parent
     logger = configure_logging(project_root, "free")
     try:
-        if not step0.ask_for_confirmation(logger):
+        if not common_step0.ask_for_confirmation(logger):
             return
     except Exception as error:
         logger.error(
@@ -336,6 +336,18 @@ def _log_check_summary(
 def run_check() -> None:
     project_root = Path(__file__).resolve().parent
     logger = configure_logging(project_root, "check")
+    try:
+        if not common_step0.ask_for_confirmation(logger):
+            return
+    except Exception as error:
+        logger.error(
+            "ステップエラー | 利用者番号: 該当なし | 申込回: 該当なし | "
+            "ステップ: step0 | ステップ内の処理: 実行確認 | 理由: %s: %s",
+            type(error).__name__,
+            error,
+        )
+        raise
+
     config = load_check_config(project_root / "endoCustom" / "checkConfig.json")
     steps = (
         common_step1.run,
